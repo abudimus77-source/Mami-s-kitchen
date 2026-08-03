@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tasty Bites | Premium Digital Menu</title>
+  <!-- FontAwesome & Styling -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+  <link rel="stylesheet" href="style.css">
+  <!-- Supabase JS Client Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- Header Navigation -->
+  <header class="header">
+    <div class="header-container">
+      <a href="index.html" class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-utensils"></i>
+        </div>
+        <div>
+          <h1 class="brand-title">Tasty <span>Bites</span></h1>
+          <span class="brand-subtitle"><i class="fa-solid fa-qrcode"></i> Digital Menu & Fresh Dining</span>
+        </div>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="container">
+    <!-- Controls & Search Bar -->
+    <div class="controls-bar">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="search" id="searchInput" placeholder="Search dishes, drinks, desserts..." oninput="handleSearch(this.value)">
+      </div>
+      
+      <!-- Category Filter Pills -->
+      <nav class="categories" id="categoryNav">
+        <button class="cat-btn active" onclick="filterCategory('All')">
+          <i class="fa-solid fa-border-all"></i> All <span class="cat-count" id="countAll">0</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('Main')">
+          <i class="fa-solid fa-burger"></i> Mains <span class="cat-count" id="countMain">0</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('Drinks')">
+          <i class="fa-solid fa-glass-water"></i> Drinks <span class="cat-count" id="countDrinks">0</span>
+        </button>
+        <button class="cat-btn" onclick="filterCategory('Dessert')">
+          <i class="fa-solid fa-cake-candles"></i> Desserts <span class="cat-count" id="countDessert">0</span>
+        </button>
+      </nav>
+    </div>
+
+    <div class="ordering-shell">
+      <aside class="order-card">
+        <div class="order-card-header">
+          <div>
+            <p class="eyebrow">Your Order</p>
+            <h3>Ready to order</h3>
+          </div>
+          <span class="order-pill" id="cartCountPill">0 items</span>
+        </div>
+
+        <div id="cartItemsList" class="cart-items-list">
+          <div class="empty-cart">Tap “Add to order” on any dish to build your meal.</div>
+        </div>
+
+        <div class="order-summary">
+          <div class="order-total-row">
+            <span>Subtotal</span>
+            <strong id="cartTotal">Br 0</strong>
+          </div>
+
+          <div class="service-toggle">
+            <button type="button" class="service-chip active" data-mode="dine-in" onclick="setServiceMode('dine-in')">
+              <i class="fa-solid fa-utensils"></i> Dine In
+            </button>
+            <button type="button" class="service-chip" data-mode="takeaway" onclick="setServiceMode('takeaway')">
+              <i class="fa-solid fa-bag-shopping"></i> Takeaway
+            </button>
+          </div>
+
+          <label class="form-row">
+            <span>Name</span>
+            <input type="text" id="customerName" placeholder="Your name">
+          </label>
+
+          <label class="form-row" id="tableRow">
+            <span>Table Number</span>
+            <input type="text" id="tableNumber" placeholder="e.g. 12">
+          </label>
+
+          <label class="form-row">
+            <span>Notes</span>
+            <textarea id="orderNotes" rows="2" placeholder="Allergies or special requests"></textarea>
+          </label>
+
+          <button class="btn-primary order-btn" onclick="placeOrder()">Place Order</button>
+        </div>
+      </aside>
+
+      <section class="menu-section">
+        <div id="customerMenu" class="menu-grid">
+          <!-- Menu items dynamically rendered here -->
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Item Detail Modal -->
+  <div id="itemModal" class="modal-overlay" onclick="closeModalOnBackdrop(event)">
+    <div class="modal-card">
+      <button class="modal-close" onclick="closeItemModal()">&times;</button>
+      <img id="modalImg" class="modal-img" src="" alt="Food item">
+      <div class="modal-body">
+        <div id="modalBadge" class="badge-tag" style="position:static; display:inline-flex; margin-bottom:10px;">
+          <i class="fa-solid fa-star"></i> Featured
+        </div>
+        <h2 id="modalTitle" class="card-title" style="font-size:1.6rem; margin-bottom:8px;">Item Name</h2>
+        <p id="modalDesc" class="card-desc" style="line-clamp:initial; -webkit-line-clamp:initial; margin-bottom:16px; font-size:0.95rem;">Item description...</p>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-glass);">
+          <span id="modalPrice" class="card-price" style="font-size:1.6rem;">Br 0</span>
+          <div class="card-actions">
+            <button class="btn-detail" onclick="closeItemModal()">Close</button>
+            <button id="modalAddToOrder" class="btn-order">Add to Order</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      renderCustomerMenu();
+    });
+  </script>
+</body>
+</html>
