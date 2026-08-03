@@ -10,6 +10,19 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+  <!-- Passcode Overlay Modal -->
+  <div id="authModal" class="modal-overlay active" style="z-index: 999; backdrop-filter: blur(15px); background: rgba(9,13,22,0.96);">
+    <div class="modal-card" style="max-width: 380px; text-align: center; padding: 28px; border: 1px solid var(--border-glass-bright);">
+      <div class="brand-icon" style="margin: 0 auto 16px; font-size: 1.8rem; width: 56px; height: 52px;">🔐</div>
+      <h3 style="color: #fff; margin-bottom: 8px; font-size: 1.3rem;">Owner Authentication</h3>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px;">Enter your admin passcode to access the control panel.</p>
+      
+      <input type="password" id="adminPinInput" placeholder="Passcode (Default: @abudi77)" style="width: 100%; padding: 12px; text-align: center; font-size: 1.2rem; letter-spacing: 4px; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); background: rgba(15,23,42,0.8); color: #fff; margin-bottom: 16px; outline: none;" onkeydown="if(event.key==='Enter') verifyAdminPin()">
+      
+      <button type="button" class="btn-primary" style="width: 100%; grid-column: auto;" onclick="verifyAdminPin()">Unlock Dashboard</button>
+    </div>
+  </div>
+
   <header class="header admin-header">
     <div class="header-container">
       <div class="brand">
@@ -151,6 +164,7 @@
   <script src="app.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
+      checkAdminAuth();
       await renderAdminMenu();
       const statusPill = document.getElementById("backendStatusPill");
       if (statusPill && typeof supabaseClient !== "undefined" && supabaseClient !== null) {
