@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Tasty Bites | Premium Digital Menu</title>
   <!-- FontAwesome & Styling -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
@@ -52,14 +52,20 @@
       </nav>
     </div>
 
+    <!-- Mobile Drawer Overlay -->
+    <div id="orderOverlay" class="order-card-overlay" onclick="toggleMobileCart(false)"></div>
+
     <div class="ordering-shell">
-      <aside class="order-card">
+      <aside id="orderCard" class="order-card">
         <div class="order-card-header">
           <div>
             <p class="eyebrow">Your Order</p>
             <h3>Ready to order</h3>
           </div>
-          <span class="order-pill" id="cartCountPill">0 items</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="order-pill" id="cartCountPill">0 items</span>
+            <button class="close-cart-mobile" onclick="toggleMobileCart(false)" style="display:none; border:none; background:transparent; color:#fff; font-size:1.3rem; cursor:pointer;" title="Close Cart">&times;</button>
+          </div>
         </div>
 
         <div id="cartItemsList" class="cart-items-list">
@@ -108,6 +114,16 @@
     </div>
   </main>
 
+  <!-- Floating Mobile Order Bar -->
+  <div id="mobileCartBar" class="mobile-cart-bar" onclick="toggleMobileCart(true)">
+    <div style="display:flex; align-items:center; gap:8px;">
+      <i class="fa-solid fa-bag-shopping"></i>
+      <span>View Order</span>
+      <span class="mobile-cart-badge" id="mobileCartBadge">0</span>
+    </div>
+    <strong id="mobileCartTotal">Br 0</strong>
+  </div>
+
   <!-- Item Detail Modal -->
   <div id="itemModal" class="modal-overlay" onclick="closeModalOnBackdrop(event)">
     <div class="modal-card">
@@ -117,10 +133,10 @@
         <div id="modalBadge" class="badge-tag" style="position:static; display:inline-flex; margin-bottom:10px;">
           <i class="fa-solid fa-star"></i> Featured
         </div>
-        <h2 id="modalTitle" class="card-title" style="font-size:1.6rem; margin-bottom:8px;">Item Name</h2>
-        <p id="modalDesc" class="card-desc" style="line-clamp:initial; -webkit-line-clamp:initial; margin-bottom:16px; font-size:0.95rem;">Item description...</p>
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-glass);">
-          <span id="modalPrice" class="card-price" style="font-size:1.6rem;">Br 0</span>
+        <h2 id="modalTitle" class="card-title" style="font-size:1.5rem; margin-bottom:8px;">Item Name</h2>
+        <p id="modalDesc" class="card-desc" style="line-clamp:initial; -webkit-line-clamp:initial; margin-bottom:16px; font-size:0.92rem;">Item description...</p>
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border-glass);">
+          <span id="modalPrice" class="card-price" style="font-size:1.5rem;">Br 0</span>
           <div class="card-actions">
             <button class="btn-detail" onclick="closeItemModal()">Close</button>
             <button id="modalAddToOrder" class="btn-order">Add to Order</button>
