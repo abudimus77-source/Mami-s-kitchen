@@ -43,7 +43,10 @@ const i18n = {
     clearCompletedBtn: "Clear Completed Orders",
     liveOrdersTab: "Incoming Live Orders",
     addDishTab: "Add New Dish",
-    menuListTab: "Current Menu Items"
+    menuListTab: "Current Menu Items",
+    analyticsTab: "Sales & Analytics",
+    callWaiter: "Call Waiter",
+    requestBill: "Request Bill"
   },
   am: {
     brandName: "ማሚስ ኪችን",
@@ -79,7 +82,10 @@ const i18n = {
     clearCompletedBtn: "የተጠናቀቁትን አጽዳ",
     liveOrdersTab: "የቀጥታ ትዕዛዞች",
     addDishTab: "አዲስ ምግብ ጨምር",
-    menuListTab: "የሜኑ ዝርዝር"
+    menuListTab: "የሜኑ ዝርዝር",
+    analyticsTab: "የሽያጭ ትንታኔ",
+    callWaiter: "አስተናጋጅ ጥራ",
+    requestBill: "ሂሳብ ጠይቅ"
   }
 };
 
@@ -127,6 +133,9 @@ function applyTranslations() {
 
   const tabMenuList = document.getElementById("tabBtn_menuList");
   if (tabMenuList) tabMenuList.innerHTML = `<i class="fa-solid fa-list-check"></i> ${t("menuListTab")}`;
+
+  const tabAnalytics = document.getElementById("tabBtn_analytics");
+  if (tabAnalytics) tabAnalytics.innerHTML = `<i class="fa-solid fa-chart-line"></i> ${t("analyticsTab")}`;
 }
 
 // Initialize Supabase Client
@@ -150,6 +159,9 @@ if (syncChannel) {
     } else if (event.data === "orders_updated") {
       if (document.getElementById("adminOrdersList")) renderAdminOrders();
       if (document.getElementById("activeOrderTracker")) renderCustomerOrderTracker();
+      if (document.getElementById("analyticsContainer")) renderAdminAnalytics();
+    } else if (event.data === "waiter_updated") {
+      if (document.getElementById("adminWaiterRequestsList")) renderAdminWaiterRequests();
     }
   };
 }
@@ -191,6 +203,10 @@ function switchAdminTab(tabName) {
 
   if (activeBtn) activeBtn.classList.add("active");
   if (activeContent) activeContent.style.display = "block";
+
+  if (tabName === "analytics") {
+    renderAdminAnalytics();
+  }
 }
 
 // --- MOBILE CART DRAWER TOGGLE ---
@@ -280,6 +296,7 @@ const defaultMenu = [
 const CART_STORAGE_KEY = "digital_menu_cart";
 const MENU_STORAGE_KEY = "digital_menu_data";
 const ORDERS_STORAGE_KEY = "digital_menu_orders";
+const WAITER_STORAGE_KEY = "digital_waiter_requests";
 const ACTIVE_ORDER_ID_KEY = "customer_active_order_id";
 
 let selectedCategory = "All";
@@ -288,6 +305,7 @@ let adminSearchQuery = "";
 let selectedServiceMode = "dine-in";
 let currentMenuItems = [];
 let currentOrders = [];
+let currentWaiterRequests = [];
 
 // --- UNIFIED DATA SERVICE ---
 const DataService = {
@@ -470,6 +488,79 @@ const DataService = {
     if (syncChannel) syncChannel.postMessage("orders_updated");
   },
 
+  // --- WAITER CALL & BILL REQUESTS ---
+  async createWaiterRequest(tableNumber, type) {
+    const reqData = {
+      id: Date.now().toString(),
+      tableNumber,
+      requestType: type, // 'call_waiter' or 'request_bill'
+      status: 'Pending',
+      createdAt: new Date().toISOString()
+    };
+
+    if (supabaseClient) {
+      const { error } = await supabaseClient.from("waiter_requests").insert([{
+        table_number: tableNumber,
+        request_type: type,
+        status: "Pending"
+      }]);
+      if (error) console.warn("Waiter request insert error:", error);
+    }
+
+    const saved = localStorage.getItem(WAITER_STORAGE_KEY);
+    const requests = saved ? JSON.parse(saved) : [];
+    requests.unshift(reqData);
+    localStorage.setItem(WAITER_STORAGE_KEY, JSON.stringify(requests));
+
+    if (syncChannel) syncChannel.postMessage("waiter_updated");
+    return reqData;
+  },
+
+  async fetchWaiterRequests() {
+    if (supabaseClient) {
+      try {
+        const { data, error } = await supabaseClient
+          .from("waiter_requests")
+          .select("*")
+          .eq("status", "Pending")
+          .order("created_at", { ascending: false });
+
+        if (!error && data) {
+          currentWaiterRequests = data.map(r => ({
+            id: String(r.id),
+            tableNumber: r.table_number,
+            requestType: r.request_type,
+            status: r.status,
+            createdAt: r.created_at
+          }));
+          return currentWaiterRequests;
+        }
+      } catch(e){}
+    }
+
+    const saved = localStorage.getItem(WAITER_STORAGE_KEY);
+    try {
+      currentWaiterRequests = saved ? JSON.parse(saved).filter(r => r.status === 'Pending') : [];
+    } catch (e) {
+      currentWaiterRequests = [];
+    }
+    return currentWaiterRequests;
+  },
+
+  async resolveWaiterRequest(reqId) {
+    if (supabaseClient) {
+      await supabaseClient.from("waiter_requests").update({ status: "Resolved" }).eq("id", reqId);
+    }
+    const saved = localStorage.getItem(WAITER_STORAGE_KEY);
+    if (saved) {
+      const requests = JSON.parse(saved);
+      const req = requests.find(r => String(r.id) === String(reqId));
+      if (req) req.status = 'Resolved';
+      localStorage.setItem(WAITER_STORAGE_KEY, JSON.stringify(requests));
+    }
+    if (syncChannel) syncChannel.postMessage("waiter_updated");
+  },
+
   async toggleAvailability(itemId) {
     const items = await this.fetchMenuItems();
     const item = items.find(i => String(i.id) === String(itemId));
@@ -536,6 +627,7 @@ const DataService = {
   subscribeToRealtime() {
     if (!supabaseClient) return;
 
+    // Realtime channel for orders
     supabaseClient
       .channel("public:orders")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, async (payload) => {
@@ -551,9 +643,30 @@ const DataService = {
         await DataService.fetchOrders();
         if (document.getElementById("adminOrdersList")) renderAdminOrders();
         if (document.getElementById("activeOrderTracker")) renderCustomerOrderTracker();
+        if (document.getElementById("analyticsContainer")) renderAdminAnalytics();
       })
       .subscribe();
 
+    // Realtime channel for waiter requests
+    supabaseClient
+      .channel("public:waiter_requests")
+      .on("postgres_changes", { event: "*", schema: "public", table: "waiter_requests" }, async (payload) => {
+        if (payload.eventType === "INSERT") {
+          if (document.getElementById("adminOrdersList")) {
+            const reqLabel = payload.new.request_type === 'request_bill' ? '🧾 Requesting Bill' : '🔔 Calling Waiter';
+            showToast(`⚠️ Table ${payload.new.table_number || 'N/A'} is ${reqLabel}!`, "error");
+            try {
+              const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+              audio.play().catch(() => {});
+            } catch(e){}
+          }
+        }
+        await DataService.fetchWaiterRequests();
+        if (document.getElementById("adminWaiterRequestsList")) renderAdminWaiterRequests();
+      })
+      .subscribe();
+
+    // Realtime channel for menu updates
     supabaseClient
       .channel("public:menu_items")
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, async () => {
@@ -564,6 +677,183 @@ const DataService = {
       .subscribe();
   }
 };
+
+// --- DIGITAL WAITER CALLING & BILL REQUEST HANDLERS ---
+async function handleCustomerWaiterAction(type) {
+  const tableInput = document.getElementById("tableNumber");
+  let tableNumber = tableInput ? tableInput.value.trim() : "";
+
+  if (!tableNumber) {
+    tableNumber = sessionStorage.getItem("detected_table_number");
+  }
+
+  if (!tableNumber) {
+    tableNumber = prompt("Please enter your Table Number:");
+    if (!tableNumber) return;
+    sessionStorage.setItem("detected_table_number", tableNumber);
+    if (tableInput) tableInput.value = tableNumber;
+  }
+
+  await DataService.createWaiterRequest(tableNumber, type);
+
+  const actionText = type === 'request_bill' ? 'Receipt/Bill Requested' : 'Waiter Called';
+  showToast(`🔔 Table ${escapeHtml(tableNumber)}: ${actionText}! Staff has been notified.`);
+}
+
+async function renderAdminWaiterRequests() {
+  const container = document.getElementById("adminWaiterRequestsList");
+  if (!container) return;
+
+  const requests = await DataService.fetchWaiterRequests();
+
+  if (requests.length === 0) {
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "block";
+  container.innerHTML = `
+    <div class="glass-card waiter-alerts-card" style="margin-bottom: 20px; border-color: rgba(245,158,11,0.5);">
+      <div class="section-header" style="margin-bottom: 10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="eyebrow" style="color:var(--primary);"><i class="fa-solid fa-bell-concierge"></i> Table Alerts (${requests.length})</span>
+        </div>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px;">
+        ${requests.map(req => {
+          const isBill = req.requestType === 'request_bill';
+          const badgeText = isBill ? '🧾 Requesting Bill' : '🔔 Called Waiter';
+          return `
+            <div class="waiter-alert-chip">
+              <strong>📍 Table ${escapeHtml(req.tableNumber)}</strong>
+              <span>${badgeText}</span>
+              <button type="button" class="btn-primary small" style="padding:4px 10px; font-size:0.75rem;" onclick="handleResolveWaiterRequest('${escapeHtml(req.id)}')">
+                <i class="fa-solid fa-check"></i> Resolve
+              </button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+async function handleResolveWaiterRequest(reqId) {
+  await DataService.resolveWaiterRequest(reqId);
+  await renderAdminWaiterRequests();
+  showToast("Waiter alert resolved!");
+}
+
+// --- SALES & REVENUE ANALYTICS ENGINE ---
+async function renderAdminAnalytics() {
+  const container = document.getElementById("analyticsContainer");
+  if (!container) return;
+
+  const orders = await DataService.fetchOrders();
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Filter today's valid orders
+  const todayOrders = orders.filter(o => {
+    const orderDate = new Date(o.createdAt || Date.now()).toISOString().split('T')[0];
+    return orderDate === todayStr && o.status !== 'Cancelled';
+  });
+
+  const totalRevenueToday = todayOrders.reduce((sum, o) => sum + (parseFloat(o.subtotal) || 0), 0);
+  const totalOrdersCountToday = todayOrders.length;
+  const avgOrderValueToday = totalOrdersCountToday > 0 ? (totalRevenueToday / totalOrdersCountToday) : 0;
+
+  // Compute Most Popular Dish of the Day
+  const dishCounts = {};
+  todayOrders.forEach(order => {
+    if (Array.isArray(order.items)) {
+      order.items.forEach(item => {
+        const name = item.name || 'Unknown Item';
+        const qty = parseInt(item.quantity) || 1;
+        dishCounts[name] = (dishCounts[name] || 0) + qty;
+      });
+    }
+  });
+
+  let topDishName = "None Yet";
+  let topDishCount = 0;
+  for (const [name, count] of Object.entries(dishCounts)) {
+    if (count > topDishCount) {
+      topDishName = name;
+      topDishCount = count;
+    }
+  }
+
+  // Peak Hours Distribution
+  const hourBuckets = { "Lunch (12PM - 3PM)": 0, "Afternoon (3PM - 6PM)": 0, "Dinner (6PM - 10PM)": 0, "Late/Other": 0 };
+  todayOrders.forEach(order => {
+    const hour = new Date(order.createdAt || Date.now()).getHours();
+    if (hour >= 12 && hour < 15) hourBuckets["Lunch (12PM - 3PM)"]++;
+    else if (hour >= 15 && hour < 18) hourBuckets["Afternoon (3PM - 6PM)"]++;
+    else if (hour >= 18 && hour < 22) hourBuckets["Dinner (6PM - 10PM)"]++;
+    else hourBuckets["Late/Other"]++;
+  });
+
+  container.innerHTML = `
+    <div class="stats-grid" style="margin-bottom: 24px;">
+      <article class="glass-card stat-card" style="border-color: rgba(16,185,129,0.4);">
+        <div class="stat-icon active"><i class="fa-solid fa-money-bill-wave"></i></div>
+        <div>
+          <div class="stat-value" style="color:var(--success);">Br ${totalRevenueToday.toFixed(0)}</div>
+          <div class="stat-label">Daily Revenue Today</div>
+        </div>
+      </article>
+
+      <article class="glass-card stat-card">
+        <div class="stat-icon total"><i class="fa-solid fa-bag-shopping"></i></div>
+        <div>
+          <div class="stat-value">${totalOrdersCountToday}</div>
+          <div class="stat-label">Orders Placed Today</div>
+        </div>
+      </article>
+
+      <article class="glass-card stat-card" style="border-color: rgba(245,158,11,0.4);">
+        <div class="stat-icon avg"><i class="fa-solid fa-crown"></i></div>
+        <div>
+          <div class="stat-value" style="font-size:1.1rem; color:var(--primary); line-clamp:1; -webkit-line-clamp:1;">${escapeHtml(topDishName)}</div>
+          <div class="stat-label">Top Dish (${topDishCount} sold)</div>
+        </div>
+      </article>
+
+      <article class="glass-card stat-card">
+        <div class="stat-icon avg"><i class="fa-solid fa-calculator"></i></div>
+        <div>
+          <div class="stat-value">Br ${avgOrderValueToday.toFixed(0)}</div>
+          <div class="stat-label">Avg Order Value</div>
+        </div>
+      </article>
+    </div>
+
+    <div class="glass-card add-item-card" style="margin-bottom: 24px;">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow"><i class="fa-solid fa-clock"></i> Ordering Time Analytics</p>
+          <h3 class="section-title">Peak Ordering Hours Today</h3>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:14px; margin-top:10px;">
+        ${Object.entries(hourBuckets).map(([period, count]) => {
+          const pct = totalOrdersCountToday > 0 ? Math.round((count / totalOrdersCountToday) * 100) : 0;
+          return `
+            <div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.88rem; color:var(--text-main);">
+                <span>${period}</span>
+                <strong>${count} orders (${pct}%)</strong>
+              </div>
+              <div class="tracker-progress-wrap" style="height:10px;">
+                <div class="tracker-progress-bar" style="width: ${pct}%;"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
 
 // --- CART MANAGEMENT ---
 function getCart() {
@@ -971,6 +1261,7 @@ async function renderAdminOrders() {
   const container = document.getElementById("adminOrdersList");
   if (!container) return;
 
+  await renderAdminWaiterRequests();
   const orders = await DataService.fetchOrders();
 
   if (orders.length === 0) {
@@ -1185,3 +1476,5 @@ document.addEventListener("DOMContentLoaded", () => {
   applyTranslations();
   DataService.subscribeToRealtime();
 });
+EOF
+}
