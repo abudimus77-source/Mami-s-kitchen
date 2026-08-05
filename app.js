@@ -678,10 +678,6 @@ function renderCart() {
     return;
   }
 
-  if (placeOrderBtn) placeOrderBtn..disabled = true;
-    return;
-  }
-
   if (placeOrderBtn) placeOrderBtn.disabled = false;
 
   container.innerHTML = cartItems.map(item => `
@@ -861,4 +857,331 @@ async function renderCustomerMenu() {
 
   const allItems = await DataService.fetchMenuItems();
   renderCart();
-  set
+  setServiceMode(selectedServiceMode);
+  updateCategoryCounts(allItems);
+  renderCustomerOrderTracker();
+
+  const filteredItems = allItems.filter(item => {
+    const isAvailable = item.available;
+    const matchesCat = selectedCategory === "All" || item.category === selectedCategory;
+    const matchesSearch = !searchQuery || 
+      item.name.toLowerCase().includes(searchQuery) || 
+      (item.desc && item.desc.toLowerCase().includes(searchQuery));
+    return isAvailable && matchesCat && matchesSearch;
+  });
+
+  if (filteredItems.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-solid fa-plate-wheat"></i></div>
+        <h3>No Menu Items Found</h3>
+        <p>Try searching for something else or changing categories.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filteredItems.map(item => `
+    <div class="glass-card card" onclick="openItemModal('${escapeHtml(item.id)}')">
+      <div class="card-image-wrap">
+        <img src="${escapeHtml(item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80')}" alt="${escapeHtml(item.name)}">
+        ${item.badge ? `<div class="badge-tag">${escapeHtml(item.badge)}</div>` : ''}
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <div class="card-title">${escapeHtml(item.name)}</div>
+          <div class="card-desc">${escapeHtml(item.desc || 'Freshly prepared delicious item.')}</div>
+        </div>
+        <div class="card-footer">
+          <div class="card-price">Br ${parseFloat(item.price).toFixed(0)}</div>
+          <div class="card-actions">
+            <button class="btn-detail" onclick="event.stopPropagation(); openItemModal('${escapeHtml(item.id)}')">
+              <i class="fa-solid fa-eye"></i> ${t("detailsBtn")}
+            </button>
+            <button class="btn-order" onclick="event.stopPropagation(); addToCart('${escapeHtml(item.id)}')">
+              ${t("addBtn")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+// --- MODAL ---
+function openItemModal(id) {
+  const item = currentMenuItems.find(i => String(i.id) === String(id));
+  if (!item) return;
+
+  document.getElementById("modalImg").src = item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80';
+  document.getElementById("modalTitle").innerText = item.name;
+  document.getElementById("modalDesc").innerText = item.desc || 'Fresh gourmet dish prepared with finest ingredients.';
+  document.getElementById("modalPrice").innerText = `Br ${parseFloat(item.price).toFixed(0)}`;
+
+  const addButton = document.getElementById("modalAddToOrder");
+  if (addButton) {
+    addButton.innerText = t("addBtn");
+    addButton.onclick = () => {
+      addToCart(item.id);
+      closeItemModal();
+    };
+  }
+  
+  const badgeEl = document.getElementById("modalBadge");
+  if (badgeEl) badgeEl.innerText = item.badge || item.category;
+
+  const modal = document.getElementById("itemModal");
+  if (modal) modal.classList.add("active");
+}
+
+function closeItemModal() {
+  const modal = document.getElementById("itemModal");
+  if (modal) modal.classList.remove("active");
+}
+
+function closeModalOnBackdrop(event) {
+  if (event.target.id === "itemModal") closeItemModal();
+}
+
+// --- ADMIN CONTROL CENTER ---
+function updateAdminStats(items) {
+  const total = items.length;
+  const active = items.filter(i => i.available).length;
+  const sold = total - active;
+  const avg = total > 0 ? (items.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0) / total) : 0;
+
+  const totalEl = document.getElementById("statTotalItems");
+  const activeEl = document.getElementById("statActiveItems");
+  const soldEl = document.getElementById("statSoldOutItems");
+  const avgEl = document.getElementById("statAvgPrice");
+
+  if (totalEl) totalEl.innerText = total;
+  if (activeEl) activeEl.innerText = active;
+  if (soldEl) soldEl.innerText = sold;
+  if (avgEl) avgEl.innerText = `Br ${avg.toFixed(0)}`;
+}
+
+async function handleOrderStatusChange(id, status) {
+  await DataService.updateOrderStatus(id, status);
+  await renderAdminOrders();
+  showToast(`Order status updated to ${status}`);
+}
+
+async function renderAdminOrders() {
+  const container = document.getElementById("adminOrdersList");
+  if (!container) return;
+
+  const orders = await DataService.fetchOrders();
+
+  if (orders.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state glass-card">
+        <div class="empty-state-icon"><i class="fa-solid fa-receipt"></i></div>
+        <h3>No Incoming Orders Yet</h3>
+        <p>Customer orders will stream here in real-time as soon as they place one.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = orders.map(order => {
+    const subtotal = order.items.reduce((total, item) => total + (parseFloat(item.price) || 0) * item.quantity, 0);
+    const statusClass = escapeHtml((order.status || 'Pending').toLowerCase());
+    const tableDisplay = order.tableNumber ? `${t("tableLabel")} ${escapeHtml(order.tableNumber)}` : 'No Table #';
+    const serviceLabel = order.serviceMode === 'takeaway' ? `🥡 ${t("takeaway")}` : `🍽️ ${t("dineIn")}`;
+
+    return `
+      <div class="glass-card order-card-admin">
+        <div class="order-admin-header">
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div class="table-badge-prominent">
+              <i class="fa-solid fa-chair"></i> ${tableDisplay}
+            </div>
+            <div>
+              <h4 style="margin:0;">${escapeHtml(order.customerName || 'Guest')}</h4>
+              <p style="margin:0; font-size:0.82rem; color:var(--text-muted);">${serviceLabel}</p>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="order-status ${statusClass}">${escapeHtml(order.status || 'Pending')}</span>
+            <button class="btn-delete small" onclick="handleDeleteOrder('${escapeHtml(order.id)}')" title="Delete Order Record">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="order-admin-items">
+          ${order.items.map(item => `<div class="order-admin-item"><strong>${item.quantity}×</strong> ${escapeHtml(item.name)}</div>`).join('')}
+        </div>
+
+        <div class="order-admin-footer">
+          <div>
+            <strong>Br ${subtotal.toFixed(0)}</strong>
+            ${order.notes ? `<div class="order-notes">💬 ${escapeHtml(order.notes)}</div>` : ''}
+          </div>
+          <div class="order-admin-actions">
+            <button class="btn-order small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Preparing')">👨‍🍳 ${t("preparing")}</button>
+            <button class="btn-detail small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Ready')">🔔 ${t("ready")}</button>
+            <button class="btn-complete small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Completed')">✅ ${t("completed")}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function renderAdminMenu() {
+  const container = document.getElementById("adminMenuList");
+  if (!container) return;
+
+  const items = await DataService.fetchMenuItems();
+  updateAdminStats(items);
+  renderAdminOrders();
+
+  const filteredItems = items.filter(item => {
+    return !adminSearchQuery || 
+      item.name.toLowerCase().includes(adminSearchQuery) || 
+      item.category.toLowerCase().includes(adminSearchQuery);
+  });
+
+  if (filteredItems.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state glass-card">
+        <div class="empty-state-icon"><i class="fa-solid fa-folder-open"></i></div>
+        <h3>No Items Found</h3>
+        <p>No menu items match your search filter.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filteredItems.map(item => `
+    <div class="glass-card admin-item-row">
+      <div class="admin-item-info">
+        <img src="${escapeHtml(item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100')}" alt="${escapeHtml(item.name)}">
+        <div class="admin-item-details">
+          <h4>${escapeHtml(item.name)}</h4>
+          <span>${escapeHtml(item.category)} • ${escapeHtml(item.badge || 'Standard')}</span>
+        </div>
+      </div>
+
+      <div class="admin-controls">
+        <div class="price-input-wrap">
+          <span>Br</span>
+          <input 
+            type="number" 
+            step="1" 
+            value="${parseFloat(item.price).toFixed(0)}" 
+            class="price-input" 
+            onchange="handlePriceUpdate('${escapeHtml(item.id)}', this.value)"
+          >
+        </div>
+
+        <label class="switch" title="Toggle Stock (In Stock / Sold Out)">
+          <input 
+            type="checkbox" 
+            ${item.available ? 'checked' : ''} 
+            onchange="handleToggleAvailability('${escapeHtml(item.id)}')"
+          >
+          <span class="slider"></span>
+        </label>
+
+        <button class="btn-delete" onclick="handleDeleteItem('${escapeHtml(item.id)}')" title="Delete Menu Item">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function handleToggleAvailability(id) {
+  await DataService.toggleAvailability(id);
+  await renderAdminMenu();
+  showToast("Item availability toggled!");
+}
+
+async function handlePriceUpdate(id, newPrice) {
+  await DataService.updatePrice(id, newPrice);
+  await renderAdminMenu();
+  showToast("Item price updated!");
+}
+
+async function handleDeleteItem(id) {
+  if (confirm("Are you sure you want to delete this menu item?")) {
+    await DataService.deleteItem(id);
+    await renderAdminMenu();
+    showToast("Menu item deleted!");
+  }
+}
+
+function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject("Failed to read image");
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleAddItem(event) {
+  event.preventDefault();
+  const name = document.getElementById("itemName").value.trim();
+  const category = document.getElementById("itemCategory").value;
+  const price = parseFloat(document.getElementById("itemPrice").value);
+  const badge = document.getElementById("itemBadge").value.trim();
+  const desc = document.getElementById("itemDesc").value.trim();
+  const imageUrlInput = document.getElementById("itemImageUrl").value.trim();
+  const imageFileInput = document.getElementById("itemImage");
+  const imageFile = imageFileInput ? imageFileInput.files[0] : null;
+
+  let image = imageUrlInput;
+
+  if (imageFile) {
+    if (imageFile.size > 1024 * 1024) {
+      showToast("Uploaded image file is over 1MB. Please use an Image URL or smaller file.", "error");
+      return;
+    }
+    try {
+      image = await readImageAsDataUrl(imageFile);
+    } catch (error) {
+      showToast("Could not read selected image file.", "error");
+      return;
+    }
+  }
+
+  if (!image) {
+    image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80";
+  }
+
+  const newItem = {
+    id: Date.now().toString(),
+    name,
+    category,
+    price,
+    badge,
+    desc: desc || "Freshly prepared delicious item.",
+    image,
+    available: true
+  };
+
+  await DataService.addItem(newItem);
+  event.target.reset();
+  await renderAdminMenu();
+  showToast(`Added "${name}" to menu!`);
+}
+
+async function resetToDefaultMenu() {
+  if (confirm("Reset menu to original sample items?")) {
+    await DataService.saveMenuItems(defaultMenu);
+    if (document.getElementById("adminMenuList")) renderAdminMenu();
+    if (document.getElementById("customerMenu")) renderCustomerMenu();
+    showToast("Menu reset to sample data!");
+  }
+}
+
+// Global initialization
+document.addEventListener("DOMContentLoaded", () => {
+  detectTableFromUrl();
+  applyTranslations();
+  DataService.subscribeToRealtime();
+});
