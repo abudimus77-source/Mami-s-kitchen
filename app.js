@@ -996,3 +996,14 @@ document.addEventListener("DOMContentLoaded", () => {
   detectTableFromUrl();
   DataService.subscribeToRealtime();
 });
+// --- ADMIN TAB NAVIGATION ---
+function switchAdminTab(tabName) {
+  document.querySelectorAll(".admin-tab-btn").forEach(btn => btn.classList.remove("active"));
+  document.querySelectorAll(".admin-tab-content").forEach(content => content.style.display = "none");
+
+  const activeBtn = document.getElementById(`tabBtn_${tabName}`);
+  const activeContent = document.getElementById(`tabContent_${tabName}`);
+
+  if (activeBtn) activeBtn.classList.add("active");
+  if (activeContent) activeContent.style.display = "block";
+}
