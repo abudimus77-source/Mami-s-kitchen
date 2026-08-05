@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Owner Control Panel - Digital Menu</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="style.css">
@@ -17,7 +17,7 @@
       <h3 style="color: #fff; margin-bottom: 8px; font-size: 1.3rem;">Owner Authentication</h3>
       <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px;">Enter your admin passcode to access the control panel.</p>
       
-      <input type="password" id="adminPinInput" placeholder="Passcode (Default: @abudi77)" style="width: 100%; padding: 12px; text-align: center; font-size: 1.2rem; letter-spacing: 4px; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); background: rgba(15,23,42,0.8); color: #fff; margin-bottom: 16px; outline: none;" onkeydown="if(event.key==='Enter') verifyAdminPin()">
+      <input type="password" id="adminPinInput" placeholder="Passcode (Default: 1234)" style="width: 100%; padding: 12px; text-align: center; font-size: 1.2rem; letter-spacing: 4px; border-radius: var(--radius-sm); border: 1px solid var(--border-glass); background: rgba(15,23,42,0.8); color: #fff; margin-bottom: 16px; outline: none;" onkeydown="if(event.key==='Enter') verifyAdminPin()">
       
       <button type="button" class="btn-primary" style="width: 100%; grid-column: auto;" onclick="verifyAdminPin()">Unlock Dashboard</button>
     </div>
@@ -35,7 +35,7 @@
 
       <div class="header-actions">
         <button class="nav-link" type="button" onclick="resetToDefaultMenu()">
-          <i class="fa-solid fa-rotate-left"></i> Reset Sample Menu
+          <i class="fa-solid fa-rotate-left"></i> Reset Menu
         </button>
         <a href="index.html" target="_blank" class="nav-link">
           <i class="fa-solid fa-arrow-up-right-from-square"></i> Customer View
@@ -58,6 +58,7 @@
       </div>
     </section>
 
+    <!-- Statistics Grid -->
     <section class="stats-grid" aria-label="Menu statistics">
       <article class="glass-card stat-card">
         <div class="stat-icon total"><i class="fa-solid fa-list"></i></div>
@@ -89,74 +90,96 @@
       </article>
     </section>
 
-    <section class="glass-card add-item-card">
-      <div class="section-header">
-        <div>
-          <p class="eyebrow">Add New Dish</p>
-          <h3 class="section-title">Create a new menu item</h3>
-        </div>
-      </div>
+    <!-- Admin Tab Navigation Bar -->
+    <nav class="admin-tab-bar" aria-label="Admin Navigation Tabs">
+      <button type="button" id="tabBtn_liveOrders" class="admin-tab-btn active" onclick="switchAdminTab('liveOrders')">
+        <i class="fa-solid fa-bell"></i> Incoming Live Orders
+      </button>
+      <button type="button" id="tabBtn_addDish" class="admin-tab-btn" onclick="switchAdminTab('addDish')">
+        <i class="fa-solid fa-plus"></i> Add New Dish
+      </button>
+      <button type="button" id="tabBtn_menuList" class="admin-tab-btn" onclick="switchAdminTab('menuList')">
+        <i class="fa-solid fa-list-check"></i> Current Menu Items
+      </button>
+    </nav>
 
-      <form id="addItemForm" onsubmit="handleAddItem(event)" class="add-form">
-        <div class="form-group">
-          <label for="itemName">Item name</label>
-          <input type="text" id="itemName" placeholder="Food Name" required>
+    <!-- TAB 1: Live Orders Queue (Primary View) -->
+    <div id="tabContent_liveOrders" class="admin-tab-content active">
+      <section class="admin-section">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Realtime Queue</p>
+            <h3 class="section-title">Incoming Live Customer Orders</h3>
+          </div>
         </div>
-        <div class="form-group">
-          <label for="itemCategory">Category</label>
-          <select id="itemCategory" required>
-            <option value="Main">Main</option>
-            <option value="Drinks">Drinks</option>
-            <option value="Dessert">Dessert</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="itemPrice">Price</label>
-          <input type="number" id="itemPrice" step="1" placeholder="Price (Birr)" required>
-        </div>
-        <div class="form-group">
-          <label for="itemBadge">Badge</label>
-          <input type="text" id="itemBadge" placeholder="e.g. New, Popular">
-        </div>
-        <div class="form-group full-width">
-          <label for="itemDesc">Description</label>
-          <textarea id="itemDesc" placeholder="Describe the dish or beverage..."></textarea>
-        </div>
-        <div class="form-group full-width">
-          <label for="itemImageUrl">Image URL</label>
-          <input type="url" id="itemImageUrl" placeholder="Image URL (recommended)">
-        </div>
-        <div class="form-group full-width">
-          <label for="itemImage">Upload local image file</label>
-          <input type="file" id="itemImage" accept="image/*">
-        </div>
-        <button type="submit" class="btn-primary">Add Item</button>
-      </form>
-    </section>
+        <div id="adminOrdersList" class="admin-orders-list"></div>
+      </section>
+    </div>
 
-    <section class="admin-section">
-      <div class="section-header">
-        <div>
-          <p class="eyebrow">Orders Queue</p>
-          <h3 class="section-title">Incoming Live Orders</h3>
+    <!-- TAB 2: Add New Dish Form -->
+    <div id="tabContent_addDish" class="admin-tab-content" style="display:none;">
+      <section class="glass-card add-item-card">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Add New Dish</p>
+            <h3 class="section-title">Create a new menu item</h3>
+          </div>
         </div>
-      </div>
-      <div id="adminOrdersList" class="admin-orders-list"></div>
-    </section>
 
-    <section class="admin-section">
-      <div class="section-header">
-        <div>
-          <p class="eyebrow">Menu Management</p>
-          <h3 class="section-title">Current Menu Items</h3>
+        <form id="addItemForm" onsubmit="handleAddItem(event)" class="add-form">
+          <div class="form-group">
+            <label for="itemName">Item name</label>
+            <input type="text" id="itemName" placeholder="Food Name" required>
+          </div>
+          <div class="form-group">
+            <label for="itemCategory">Category</label>
+            <select id="itemCategory" required>
+              <option value="Main">Main</option>
+              <option value="Drinks">Drinks</option>
+              <option value="Dessert">Dessert</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="itemPrice">Price</label>
+            <input type="number" id="itemPrice" step="1" placeholder="Price (Birr)" required>
+          </div>
+          <div class="form-group">
+            <label for="itemBadge">Badge</label>
+            <input type="text" id="itemBadge" placeholder="e.g. New, Popular">
+          </div>
+          <div class="form-group full-width">
+            <label for="itemDesc">Description</label>
+            <textarea id="itemDesc" placeholder="Describe the dish or beverage..."></textarea>
+          </div>
+          <div class="form-group full-width">
+            <label for="itemImageUrl">Image URL</label>
+            <input type="url" id="itemImageUrl" placeholder="Image URL (recommended)">
+          </div>
+          <div class="form-group full-width">
+            <label for="itemImage">Upload local image file</label>
+            <input type="file" id="itemImage" accept="image/*">
+          </div>
+          <button type="submit" class="btn-primary">Add Item</button>
+        </form>
+      </section>
+    </div>
+
+    <!-- TAB 3: Current Menu Management List -->
+    <div id="tabContent_menuList" class="admin-tab-content" style="display:none;">
+      <section class="admin-section">
+        <div class="section-header">
+          <div>
+            <p class="eyebrow">Menu Management</p>
+            <h3 class="section-title">Current Menu Items</h3>
+          </div>
+          <div class="search-box admin-search">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="search" id="adminSearchInput" placeholder="Search items..." oninput="handleAdminSearch(this.value)">
+          </div>
         </div>
-        <div class="search-box admin-search">
-          <i class="fa-solid fa-magnifying-glass search-icon"></i>
-          <input type="search" id="adminSearchInput" placeholder="Search items..." oninput="handleAdminSearch(this.value)">
-        </div>
-      </div>
-      <div id="adminMenuList" class="admin-menu-list"></div>
-    </section>
+        <div id="adminMenuList" class="admin-menu-list"></div>
+      </section>
+    </div>
   </main>
 
   <div id="toastContainer" class="toast-container"></div>
