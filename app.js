@@ -59,6 +59,18 @@ function checkAdminAuth() {
   }
 }
 
+// --- ADMIN TAB NAVIGATION ---
+function switchAdminTab(tabName) {
+  document.querySelectorAll(".admin-tab-btn").forEach(btn => btn.classList.remove("active"));
+  document.querySelectorAll(".admin-tab-content").forEach(content => content.style.display = "none");
+
+  const activeBtn = document.getElementById(`tabBtn_${tabName}`);
+  const activeContent = document.getElementById(`tabContent_${tabName}`);
+
+  if (activeBtn) activeBtn.classList.add("active");
+  if (activeContent) activeContent.style.display = "block";
+}
+
 // --- MOBILE CART DRAWER TOGGLE ---
 function toggleMobileCart(show) {
   const orderCard = document.getElementById("orderCard");
@@ -306,6 +318,36 @@ const DataService = {
     }
   },
 
+  async deleteOrder(orderId) {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("orders")
+        .delete()
+        .eq("id", orderId);
+      if (error) console.error("Supabase delete order error:", error);
+    }
+
+    const orders = await this.fetchOrders();
+    const updated = orders.filter(o => String(o.id) !== String(orderId));
+    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(updated));
+    if (syncChannel) syncChannel.postMessage("orders_updated");
+  },
+
+  async clearCompletedOrders() {
+    if (supabaseClient) {
+      const { error } = await supabaseClient
+        .from("orders")
+        .delete()
+        .in("status", ["Completed", "Cancelled"]);
+      if (error) console.error("Supabase clear completed error:", error);
+    }
+
+    const orders = await this.fetchOrders();
+    const updated = orders.filter(o => o.status !== "Completed" && o.status !== "Cancelled");
+    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(updated));
+    if (syncChannel) syncChannel.postMessage("orders_updated");
+  },
+
   async toggleAvailability(itemId) {
     const items = await this.fetchMenuItems();
     const item = items.find(i => String(i.id) === String(itemId));
@@ -375,7 +417,6 @@ const DataService = {
     supabaseClient
       .channel("public:orders")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, async (payload) => {
-        // Audio Chime ONLY plays on Admin Dashboard (admin.html)
         if (payload.eventType === "INSERT") {
           if (document.getElementById("adminOrdersList")) {
             showToast(`🔔 New Order from Table ${payload.new.table_number || 'N/A'} (${payload.new.customer_name || 'Guest'})!`);
@@ -492,7 +533,6 @@ function renderCart() {
 
   if (totalEl) totalEl.innerText = subtotalFormatted;
 
-  // Update Floating Mobile Cart Bar
   const mobileBar = document.getElementById("mobileCartBar");
   const mobileBadge = document.getElementById("mobileCartBadge");
   const mobileTotal = document.getElementById("mobileCartTotal");
@@ -635,6 +675,23 @@ async function renderCustomerOrderTracker() {
       </div>
     </div>
   `;
+}
+
+// --- ADMIN ORDER DELETION & CLEANING HANDLERS ---
+async function handleDeleteOrder(orderId) {
+  if (confirm("Delete this order record from database?")) {
+    await DataService.deleteOrder(orderId);
+    await renderAdminOrders();
+    showToast("Order deleted!");
+  }
+}
+
+async function handleClearCompletedOrders() {
+  if (confirm("Clear all completed and cancelled orders from queue?")) {
+    await DataService.clearCompletedOrders();
+    await renderAdminOrders();
+    showToast("Completed orders cleared!");
+  }
 }
 
 // --- SEARCH & FILTER ---
@@ -821,7 +878,12 @@ async function renderAdminOrders() {
               <p style="margin:0; font-size:0.82rem; color:var(--text-muted);">${serviceLabel}</p>
             </div>
           </div>
-          <span class="order-status ${statusClass}">${escapeHtml(order.status || 'Pending')}</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="order-status ${statusClass}">${escapeHtml(order.status || 'Pending')}</span>
+            <button class="btn-delete small" onclick="handleDeleteOrder('${escapeHtml(order.id)}')" title="Delete Order Record">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
         </div>
 
         <div class="order-admin-items">
@@ -836,7 +898,9 @@ async function renderAdminOrders() {
           <div class="order-admin-actions">
             <button class="btn-order small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Preparing')">👨‍🍳 Preparing</button>
             <button class="btn-detail small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Ready')">🔔 Ready</button>
-           <button class="btn-complete small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Completed')">✅ Complete</button>
+            <button class="btn-complete small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Completed')">✅ Complete</button>
+          </div>
+        </div>
       </div>
     `;
   }).join('');
@@ -996,14 +1060,5 @@ document.addEventListener("DOMContentLoaded", () => {
   detectTableFromUrl();
   DataService.subscribeToRealtime();
 });
-// --- ADMIN TAB NAVIGATION ---
-function switchAdminTab(tabName) {
-  document.querySelectorAll(".admin-tab-btn").forEach(btn => btn.classList.remove("active"));
-  document.querySelectorAll(".admin-tab-content").forEach(content => content.style.display = "none");
-
-  const activeBtn = document.getElementById(`tabBtn_${tabName}`);
-  const activeContent = document.getElementById(`tabContent_${tabName}`);
-
-  if (activeBtn) activeBtn.classList.add("active");
-  if (activeContent) activeContent.style.display = "block";
+EOF
 }
