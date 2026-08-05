@@ -101,6 +101,9 @@
       <button type="button" id="tabBtn_liveOrders" class="admin-tab-btn active" onclick="switchAdminTab('liveOrders')">
         <i class="fa-solid fa-bell"></i> Incoming Live Orders
       </button>
+      <button type="button" id="tabBtn_analytics" class="admin-tab-btn" onclick="switchAdminTab('analytics')">
+        <i class="fa-solid fa-chart-line"></i> Sales & Analytics
+      </button>
       <button type="button" id="tabBtn_addDish" class="admin-tab-btn" onclick="switchAdminTab('addDish')">
         <i class="fa-solid fa-plus"></i> Add New Dish
       </button>
@@ -111,6 +114,9 @@
 
     <!-- TAB 1: Live Orders Queue (Primary View) -->
     <div id="tabContent_liveOrders" class="admin-tab-content active">
+      <!-- Live Table Waiter Alerts Banner Queue -->
+      <div id="adminWaiterRequestsList" style="display:none;"></div>
+
       <section class="admin-section">
         <div class="section-header">
           <div>
@@ -125,7 +131,12 @@
       </section>
     </div>
 
-    <!-- TAB 2: Add New Dish Form -->
+    <!-- TAB 2: Sales & Revenue Analytics Dashboard -->
+    <div id="tabContent_analytics" class="admin-tab-content" style="display:none;">
+      <div id="analyticsContainer"></div>
+    </div>
+
+    <!-- TAB 3: Add New Dish Form -->
     <div id="tabContent_addDish" class="admin-tab-content" style="display:none;">
       <section class="glass-card add-item-card">
         <div class="section-header">
@@ -173,7 +184,7 @@
       </section>
     </div>
 
-    <!-- TAB 3: Current Menu Management List -->
+    <!-- TAB 4: Current Menu Management List -->
     <div id="tabContent_menuList" class="admin-tab-content" style="display:none;">
       <section class="admin-section">
         <div class="section-header">
