@@ -1244,6 +1244,32 @@ input:checked + .slider:before {
   .cart-item {
     grid-template-columns: 1fr auto;
   }
+  /* Complete Button Styling (Matches Preparing & Ready) */
+.btn-complete {
+  padding: 8px 14px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: var(--success);
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-complete:hover {
+  background: var(--success);
+  color: #090d16;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
+.btn-complete.small {
+  padding: 6px 12px;
+  font-size: 0.78rem;
+}
   .cart-remove-btn {
     grid-column: 2;
   }
