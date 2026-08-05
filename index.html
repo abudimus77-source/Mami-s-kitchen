@@ -127,6 +127,16 @@
     </div>
   </main>
 
+  <!-- Floating Digital Waiter Actions (Customer Side) -->
+  <div class="waiter-floating-actions">
+    <button type="button" class="waiter-action-btn" onclick="handleCustomerWaiterAction('call_waiter')" title="Call Waiter">
+      <i class="fa-solid fa-bell-concierge"></i> <span class="waiter-btn-text">Call Waiter</span>
+    </button>
+    <button type="button" class="waiter-action-btn bill" onclick="handleCustomerWaiterAction('request_bill')" title="Request Bill">
+      <i class="fa-solid fa-receipt"></i> <span class="waiter-btn-text">Request Bill</span>
+    </button>
+  </div>
+
   <!-- Floating Mobile Order Bar -->
   <div id="mobileCartBar" class="mobile-cart-bar" onclick="toggleMobileCart(true)">
     <div style="display:flex; align-items:center; gap:8px;">
