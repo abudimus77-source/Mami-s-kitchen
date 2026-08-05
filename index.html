@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Tasty Bites | Premium Digital Menu</title>
+  <title>ማሚስ ኪችን | Digital Menu</title>
   <!-- FontAwesome & Styling -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="style.css">
@@ -19,11 +19,20 @@
           <i class="fa-solid fa-utensils"></i>
         </div>
         <div>
-          <h1 class="brand-title">Tasty <span>Bites</span></h1>
+          <h1 class="brand-title">ማሚስ <span>ኪችን</span></h1>
           <span class="brand-subtitle"><i class="fa-solid fa-qrcode"></i> Digital Menu & Fresh Dining</span>
         </div>
       </a>
-      <div id="headerTableBadge" class="table-badge-header" style="display:none;"></div>
+
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div id="headerTableBadge" class="table-badge-header" style="display:none;"></div>
+        
+        <!-- Language Switcher -->
+        <div class="lang-switcher">
+          <button type="button" class="lang-btn active" data-lang="en" onclick="setLanguage('en')">EN</button>
+          <button type="button" class="lang-btn" data-lang="am" onclick="setLanguage('am')">አማ</button>
+        </div>
+      </div>
     </div>
   </header>
 
