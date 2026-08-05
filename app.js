@@ -836,9 +836,7 @@ async function renderAdminOrders() {
           <div class="order-admin-actions">
             <button class="btn-order small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Preparing')">👨‍🍳 Preparing</button>
             <button class="btn-detail small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Ready')">🔔 Ready</button>
-            <button class="btn-delete small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Completed')">✅ Complete</button>
-          </div>
-        </div>
+           <button class="btn-complete small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Completed')">✅ Complete</button>
       </div>
     `;
   }).join('');
