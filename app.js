@@ -1,11 +1,133 @@
 /**
- * Tasty Bites - Upgraded Digital Menu & Realtime Order System
+ * Tasty Bites / ማሚስ ኪችን - Upgraded Digital Menu & Realtime Order System
  */
 
 // --- CONFIGURATION ---
 const SUPABASE_URL = "https://cqubbysmuvawqoccickl.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ZsrXwTLNjQu2wC9fKioVPA_36gJGsmK";
 const ADMIN_PASSCODE = "@abudi77"; // Admin owner passcode
+
+// --- TRANSLATION DICTIONARY (English & Amharic) ---
+const i18n = {
+  en: {
+    brandName: "ማሚስ ኪችን",
+    brandSubtitle: "Digital Menu & Fresh Dining",
+    searchPlaceholder: "Search dishes, drinks, desserts...",
+    catAll: "All",
+    catMain: "Mains",
+    catDrinks: "Drinks",
+    catDessert: "Desserts",
+    yourOrder: "Your Order",
+    readyToOrder: "Ready to order",
+    emptyCartMsg: "Tap “Add to order” on any dish to build your meal.",
+    subtotal: "Subtotal",
+    dineIn: "Dine In",
+    takeaway: "Takeaway",
+    nameLabel: "Name",
+    namePlaceholder: "Your name",
+    tableLabel: "Table Number",
+    tablePlaceholder: "e.g. 12",
+    notesLabel: "Notes",
+    notesPlaceholder: "Allergies or special requests",
+    placeOrderBtn: "Place Order",
+    viewOrderBar: "View Order",
+    itemsText: "items",
+    itemText: "item",
+    addBtn: "+ Add",
+    detailsBtn: "Details",
+    closeBtn: "Close",
+    preparing: "Preparing",
+    ready: "Ready",
+    completed: "Complete",
+    deleteBtn: "Delete",
+    clearCompletedBtn: "Clear Completed Orders",
+    liveOrdersTab: "Incoming Live Orders",
+    addDishTab: "Add New Dish",
+    menuListTab: "Current Menu Items"
+  },
+  am: {
+    brandName: "ማሚስ ኪችን",
+    brandSubtitle: "ዲጂታል ሜኑ እና ጣፋጭ ምግብ",
+    searchPlaceholder: "ምግቦችን፣ መጠጦችን፣ ጣፋጮችን ይፈልጉ...",
+    catAll: "ሁሉም",
+    catMain: "ዋና ምግቦች",
+    catDrinks: "መጠጦች",
+    catDessert: "ጣፋጮች",
+    yourOrder: "ትዕዛዝዎ",
+    readyToOrder: "ለማዘዝ ዝግጁ",
+    emptyCartMsg: "ምግብ ለመምረጥ “ጨምር” የሚለውን ይጫኑ።",
+    subtotal: "ጠቅላላ ዋጋ",
+    dineIn: "እዚሁ ለመመገብ",
+    takeaway: "ይዞ ለመሄድ",
+    nameLabel: "ስም",
+    namePlaceholder: "ስምዎን ያስገቡ",
+    tableLabel: "የጠረጴዛ ቁጥር",
+    tablePlaceholder: "ምሳሌ፡ 12",
+    notesLabel: "ማስታወሻ",
+    notesPlaceholder: "ተጨማሪ ፍላጎት ወይም አለርጂ ካለዎት ያስገቡ",
+    placeOrderBtn: "ትዕዛዝ ይላኩ",
+    viewOrderBar: "ትዕዛዝ ይመልከቱ",
+    itemsText: "ምግቦች",
+    itemText: "ምግብ",
+    addBtn: "+ ጨምር",
+    detailsBtn: "ዝርዝር",
+    closeBtn: "ዝጋ",
+    preparing: "እየተዘጋጀ ነው",
+    ready: "ተዘጋጅቷል",
+    completed: "ተጠናቋል",
+    deleteBtn: "ሰርዝ",
+    clearCompletedBtn: "የተጠናቀቁትን አጽዳ",
+    liveOrdersTab: "የቀጥታ ትዕዛዞች",
+    addDishTab: "አዲስ ምግብ ጨምር",
+    menuListTab: "የሜኑ ዝርዝር"
+  }
+};
+
+let currentLang = localStorage.getItem("app_language") || "en";
+
+function setLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem("app_language", lang);
+
+  document.querySelectorAll(".lang-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.lang === lang);
+  });
+
+  applyTranslations();
+  if (document.getElementById("customerMenu")) renderCustomerMenu();
+  if (document.getElementById("adminMenuList")) renderAdminMenu();
+  showToast(lang === "am" ? "ቋንቋ ወደ አማርኛ ተቀይሯል" : "Language set to English");
+}
+
+function t(key) {
+  return (i18n[currentLang] && i18n[currentLang][key]) || i18n["en"][key] || key;
+}
+
+function applyTranslations() {
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) searchInput.placeholder = t("searchPlaceholder");
+
+  const namePlaceholder = document.getElementById("customerName");
+  if (namePlaceholder) namePlaceholder.placeholder = t("namePlaceholder");
+
+  const notesPlaceholder = document.getElementById("orderNotes");
+  if (notesPlaceholder) notesPlaceholder.placeholder = t("notesPlaceholder");
+
+  const placeOrderBtn = document.querySelector(".order-btn");
+  if (placeOrderBtn) placeOrderBtn.innerText = t("placeOrderBtn");
+
+  const clearCompletedBtn = document.getElementById("clearCompletedBtnText");
+  if (clearCompletedBtn) clearCompletedBtn.innerText = t("clearCompletedBtn");
+
+  const tabLiveOrders = document.getElementById("tabBtn_liveOrders");
+  if (tabLiveOrders) tabLiveOrders.innerHTML = `<i class="fa-solid fa-bell"></i> ${t("liveOrdersTab")}`;
+
+  const tabAddDish = document.getElementById("tabBtn_addDish");
+  if (tabAddDish) tabAddDish.innerHTML = `<i class="fa-solid fa-plus"></i> ${t("addDishTab")}`;
+
+  const tabMenuList = document.getElementById("tabBtn_menuList");
+  if (tabMenuList) tabMenuList.innerHTML = `<i class="fa-solid fa-list-check"></i> ${t("menuListTab")}`;
+}
 
 // Initialize Supabase Client
 let supabaseClient = null;
@@ -104,7 +226,7 @@ function detectTableFromUrl() {
     }
     const tableBadge = document.getElementById("headerTableBadge");
     if (tableBadge) {
-      tableBadge.innerHTML = `<i class="fa-solid fa-chair"></i> Table ${escapeHtml(savedTable)}`;
+      tableBadge.innerHTML = `<i class="fa-solid fa-chair"></i> ${t("tableLabel")} ${escapeHtml(savedTable)}`;
       tableBadge.style.display = "inline-flex";
     }
   }
@@ -150,9 +272,9 @@ const defaultMenu = [
   { id: "5", name: "Tropical Mango Smoothie", category: "Drinks", price: 150, image: "https://images.unsplash.com/photo-1546173159-315724a31696?w=600&q=80", badge: "🥭 Refreshing", desc: "Blend of Alphonso mangoes, Greek yogurt, coconut water, and a touch of wild honey.", available: true },
   { id: "6", name: "Chocolate Lava Cake", category: "Dessert", price: 220, image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&q=80", badge: "🍫 Decadent", desc: "Warm dark chocolate cake with a molten chocolate center, served with Madagascan vanilla bean ice cream.", available: true },
   { id: "7", name: "Matcha Cheesecake", category: "Dessert", price: 200, image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=600&q=80", badge: "✨ New", desc: "Creamy Uji matcha infused Japanese cheesecake with a toasted graham cracker crust.", available: false },
-  { id: "8", name: "Doro Wat", category: "Main", price: 360, image: "https://images.unsplash.com/photo-1547592180-85f173990554?w=600&q=80", badge: "🔥 Spicy", desc: "Slow-cooked chicken stew with berbere spice, onion, and rich Ethiopian flavor served with injera.", available: true },
-  { id: "9", name: "Misir Wot", category: "Main", price: 300, image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=600&q=80", badge: "🌱 Vegetarian", desc: "Spiced red lentils simmered in a deep, aromatic sauce and served with warm injera.", available: true },
-  { id: "10", name: "Ethiopian Coffee", category: "Drinks", price: 120, image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80", badge: "☕ Traditional", desc: "Freshly brewed Ethiopian coffee served with a touch of cardamom and sugar.", available: true }
+  { id: "8", name: "ስፔሻል ክትፎ", category: "Main", price: 750, image: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80", badge: "🔥 Traditional", desc: "በቅቤና በሚጥሚጣ የተዘጋጀ ትኩስ አገር በቀል ስፔሻል ክትፎ።", available: true },
+  { id: "9", name: "ዶሮ ወጥ", category: "Main", price: 360, image: "https://images.unsplash.com/photo-1547592180-85f173990554?w=600&q=80", badge: "🔥 Spicy", desc: "በበርበሬና በቅቤ በጥንቃቄ የተሰራ ባህላዊ የዶሮ ወጥ ከእንጀራ ጋር።", available: true },
+  { id: "10", name: "የኢትዮጵያ ቡና", category: "Drinks", price: 120, image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80", badge: "☕ Traditional", desc: "በትኩሱ የተፈጨ ባህላዊ የኢትዮጵያ ቡና።", available: true }
 ];
 
 const CART_STORAGE_KEY = "digital_menu_cart";
@@ -528,7 +650,8 @@ function renderCart() {
   const subtotalFormatted = `Br ${getCartSubtotal(cartItems).toFixed(0)}`;
 
   if (countPill) {
-    countPill.innerText = totalItems === 1 ? "1 item" : `${totalItems} items`;
+    const itemLabel = totalItems === 1 ? t("itemText") : t("itemsText");
+    countPill.innerText = `${totalItems} ${itemLabel}`;
   }
 
   if (totalEl) totalEl.innerText = subtotalFormatted;
@@ -550,8 +673,12 @@ function renderCart() {
   if (!container) return;
 
   if (cartItems.length === 0) {
-    container.innerHTML = '<div class="empty-cart">Tap “Add to order” on any dish to build your meal.</div>';
+    container.innerHTML = `<div class="empty-cart">${t("emptyCartMsg")}</div>`;
     if (placeOrderBtn) placeOrderBtn.disabled = true;
+    return;
+  }
+
+  if (placeOrderBtn) placeOrderBtn..disabled = true;
     return;
   }
 
@@ -561,7 +688,7 @@ function renderCart() {
     <div class="cart-item">
       <div>
         <div class="cart-item-name">${escapeHtml(item.name)}</div>
-        <div class="cart-item-meta">Br ${parseFloat(item.price).toFixed(0)} each</div>
+        <div class="cart-item-meta">Br ${parseFloat(item.price).toFixed(0)}</div>
       </div>
       <div class="cart-item-controls">
         <button class="cart-qty-btn" onclick="updateCartQuantity('${escapeHtml(item.id)}', -1)">−</button>
@@ -587,8 +714,8 @@ async function placeOrder() {
   const notes = document.getElementById("orderNotes")?.value?.trim() || "";
   const tableNumber = document.getElementById("tableNumber")?.value?.trim() || sessionStorage.getItem("detected_table_number") || "";
   const subtotal = getCartSubtotal(cartItems);
-  const serviceLabel = selectedServiceMode === 'takeaway' ? 'Takeaway' : 'Dine In';
-  const locationText = selectedServiceMode === 'dine-in' && tableNumber ? ` • Table ${escapeHtml(tableNumber)}` : '';
+  const serviceLabel = selectedServiceMode === 'takeaway' ? t("takeaway") : t("dineIn");
+  const locationText = selectedServiceMode === 'dine-in' && tableNumber ? ` • ${t("tableLabel")} ${escapeHtml(tableNumber)}` : '';
 
   const newOrder = {
     id: Date.now().toString(),
@@ -660,7 +787,7 @@ async function renderCustomerOrderTracker() {
       <div class="tracker-header">
         <div>
           <span class="eyebrow"><i class="fa-solid ${statusIcon}"></i> Live Order Progress</span>
-          <h4>📍 Table ${escapeHtml(activeOrder.tableNumber || 'N/A')} (${escapeHtml(activeOrder.customerName || 'Guest')})</h4>
+          <h4>📍 ${t("tableLabel")} ${escapeHtml(activeOrder.tableNumber || 'N/A')} (${escapeHtml(activeOrder.customerName || 'Guest')})</h4>
         </div>
         <span class="order-status ${statusBadgeClass}">${escapeHtml(status)}</span>
       </div>
@@ -734,331 +861,4 @@ async function renderCustomerMenu() {
 
   const allItems = await DataService.fetchMenuItems();
   renderCart();
-  setServiceMode(selectedServiceMode);
-  updateCategoryCounts(allItems);
-  renderCustomerOrderTracker();
-
-  const filteredItems = allItems.filter(item => {
-    const isAvailable = item.available;
-    const matchesCat = selectedCategory === "All" || item.category === selectedCategory;
-    const matchesSearch = !searchQuery || 
-      item.name.toLowerCase().includes(searchQuery) || 
-      (item.desc && item.desc.toLowerCase().includes(searchQuery));
-    return isAvailable && matchesCat && matchesSearch;
-  });
-
-  if (filteredItems.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon"><i class="fa-solid fa-plate-wheat"></i></div>
-        <h3>No Menu Items Found</h3>
-        <p>Try searching for something else or changing categories.</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = filteredItems.map(item => `
-    <div class="glass-card card" onclick="openItemModal('${escapeHtml(item.id)}')">
-      <div class="card-image-wrap">
-        <img src="${escapeHtml(item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80')}" alt="${escapeHtml(item.name)}">
-        ${item.badge ? `<div class="badge-tag">${escapeHtml(item.badge)}</div>` : ''}
-      </div>
-      <div class="card-body">
-        <div class="card-header">
-          <div class="card-title">${escapeHtml(item.name)}</div>
-          <div class="card-desc">${escapeHtml(item.desc || 'Freshly prepared delicious item.')}</div>
-        </div>
-        <div class="card-footer">
-          <div class="card-price">Br ${parseFloat(item.price).toFixed(0)}</div>
-          <div class="card-actions">
-            <button class="btn-detail" onclick="event.stopPropagation(); openItemModal('${escapeHtml(item.id)}')">
-              <i class="fa-solid fa-eye"></i> Details
-            </button>
-            <button class="btn-order" onclick="event.stopPropagation(); addToCart('${escapeHtml(item.id)}')">
-              <i class="fa-solid fa-plus"></i> Add
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `).join("");
-}
-
-// --- MODAL ---
-function openItemModal(id) {
-  const item = currentMenuItems.find(i => String(i.id) === String(id));
-  if (!item) return;
-
-  document.getElementById("modalImg").src = item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80';
-  document.getElementById("modalTitle").innerText = item.name;
-  document.getElementById("modalDesc").innerText = item.desc || 'Fresh gourmet dish prepared with finest ingredients.';
-  document.getElementById("modalPrice").innerText = `Br ${parseFloat(item.price).toFixed(0)}`;
-
-  const addButton = document.getElementById("modalAddToOrder");
-  if (addButton) {
-    addButton.onclick = () => {
-      addToCart(item.id);
-      closeItemModal();
-    };
-  }
-  
-  const badgeEl = document.getElementById("modalBadge");
-  if (badgeEl) badgeEl.innerText = item.badge || item.category;
-
-  const modal = document.getElementById("itemModal");
-  if (modal) modal.classList.add("active");
-}
-
-function closeItemModal() {
-  const modal = document.getElementById("itemModal");
-  if (modal) modal.classList.remove("active");
-}
-
-function closeModalOnBackdrop(event) {
-  if (event.target.id === "itemModal") closeItemModal();
-}
-
-// --- ADMIN CONTROL CENTER ---
-function updateAdminStats(items) {
-  const total = items.length;
-  const active = items.filter(i => i.available).length;
-  const sold = total - active;
-  const avg = total > 0 ? (items.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0) / total) : 0;
-
-  const totalEl = document.getElementById("statTotalItems");
-  const activeEl = document.getElementById("statActiveItems");
-  const soldEl = document.getElementById("statSoldOutItems");
-  const avgEl = document.getElementById("statAvgPrice");
-
-  if (totalEl) totalEl.innerText = total;
-  if (activeEl) activeEl.innerText = active;
-  if (soldEl) soldEl.innerText = sold;
-  if (avgEl) avgEl.innerText = `Br ${avg.toFixed(0)}`;
-}
-
-async function handleOrderStatusChange(id, status) {
-  await DataService.updateOrderStatus(id, status);
-  await renderAdminOrders();
-  showToast(`Order status updated to ${status}`);
-}
-
-async function renderAdminOrders() {
-  const container = document.getElementById("adminOrdersList");
-  if (!container) return;
-
-  const orders = await DataService.fetchOrders();
-
-  if (orders.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state glass-card">
-        <div class="empty-state-icon"><i class="fa-solid fa-receipt"></i></div>
-        <h3>No Incoming Orders Yet</h3>
-        <p>Customer orders will stream here in real-time as soon as they place one.</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = orders.map(order => {
-    const subtotal = order.items.reduce((total, item) => total + (parseFloat(item.price) || 0) * item.quantity, 0);
-    const statusClass = escapeHtml((order.status || 'Pending').toLowerCase());
-    const tableDisplay = order.tableNumber ? `Table ${escapeHtml(order.tableNumber)}` : 'No Table #';
-    const serviceLabel = order.serviceMode === 'takeaway' ? '🥡 Takeaway' : '🍽️ Dine In';
-
-    return `
-      <div class="glass-card order-card-admin">
-        <div class="order-admin-header">
-          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-            <div class="table-badge-prominent">
-              <i class="fa-solid fa-chair"></i> ${tableDisplay}
-            </div>
-            <div>
-              <h4 style="margin:0;">${escapeHtml(order.customerName || 'Guest')}</h4>
-              <p style="margin:0; font-size:0.82rem; color:var(--text-muted);">${serviceLabel}</p>
-            </div>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="order-status ${statusClass}">${escapeHtml(order.status || 'Pending')}</span>
-            <button class="btn-delete small" onclick="handleDeleteOrder('${escapeHtml(order.id)}')" title="Delete Order Record">
-              <i class="fa-solid fa-trash-can"></i>
-            </button>
-          </div>
-        </div>
-
-        <div class="order-admin-items">
-          ${order.items.map(item => `<div class="order-admin-item"><strong>${item.quantity}×</strong> ${escapeHtml(item.name)}</div>`).join('')}
-        </div>
-
-        <div class="order-admin-footer">
-          <div>
-            <strong>Br ${subtotal.toFixed(0)}</strong>
-            ${order.notes ? `<div class="order-notes">💬 ${escapeHtml(order.notes)}</div>` : ''}
-          </div>
-          <div class="order-admin-actions">
-            <button class="btn-order small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Preparing')">👨‍🍳 Preparing</button>
-            <button class="btn-detail small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Ready')">🔔 Ready</button>
-            <button class="btn-complete small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Completed')">✅ Complete</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-async function renderAdminMenu() {
-  const container = document.getElementById("adminMenuList");
-  if (!container) return;
-
-  const items = await DataService.fetchMenuItems();
-  updateAdminStats(items);
-  renderAdminOrders();
-
-  const filteredItems = items.filter(item => {
-    return !adminSearchQuery || 
-      item.name.toLowerCase().includes(adminSearchQuery) || 
-      item.category.toLowerCase().includes(adminSearchQuery);
-  });
-
-  if (filteredItems.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state glass-card">
-        <div class="empty-state-icon"><i class="fa-solid fa-folder-open"></i></div>
-        <h3>No Items Found</h3>
-        <p>No menu items match your search filter.</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = filteredItems.map(item => `
-    <div class="glass-card admin-item-row">
-      <div class="admin-item-info">
-        <img src="${escapeHtml(item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100')}" alt="${escapeHtml(item.name)}">
-        <div class="admin-item-details">
-          <h4>${escapeHtml(item.name)}</h4>
-          <span>${escapeHtml(item.category)} • ${escapeHtml(item.badge || 'Standard')}</span>
-        </div>
-      </div>
-
-      <div class="admin-controls">
-        <div class="price-input-wrap">
-          <span>Br</span>
-          <input 
-            type="number" 
-            step="1" 
-            value="${parseFloat(item.price).toFixed(0)}" 
-            class="price-input" 
-            onchange="handlePriceUpdate('${escapeHtml(item.id)}', this.value)"
-          >
-        </div>
-
-        <label class="switch" title="Toggle Stock (In Stock / Sold Out)">
-          <input 
-            type="checkbox" 
-            ${item.available ? 'checked' : ''} 
-            onchange="handleToggleAvailability('${escapeHtml(item.id)}')"
-          >
-          <span class="slider"></span>
-        </label>
-
-        <button class="btn-delete" onclick="handleDeleteItem('${escapeHtml(item.id)}')" title="Delete Menu Item">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
-      </div>
-    </div>
-  `).join("");
-}
-
-async function handleToggleAvailability(id) {
-  await DataService.toggleAvailability(id);
-  await renderAdminMenu();
-  showToast("Item availability toggled!");
-}
-
-async function handlePriceUpdate(id, newPrice) {
-  await DataService.updatePrice(id, newPrice);
-  await renderAdminMenu();
-  showToast("Item price updated!");
-}
-
-async function handleDeleteItem(id) {
-  if (confirm("Are you sure you want to delete this menu item?")) {
-    await DataService.deleteItem(id);
-    await renderAdminMenu();
-    showToast("Menu item deleted!");
-  }
-}
-
-function readImageAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject("Failed to read image");
-    reader.readAsDataURL(file);
-  });
-}
-
-async function handleAddItem(event) {
-  event.preventDefault();
-  const name = document.getElementById("itemName").value.trim();
-  const category = document.getElementById("itemCategory").value;
-  const price = parseFloat(document.getElementById("itemPrice").value);
-  const badge = document.getElementById("itemBadge").value.trim();
-  const desc = document.getElementById("itemDesc").value.trim();
-  const imageUrlInput = document.getElementById("itemImageUrl").value.trim();
-  const imageFileInput = document.getElementById("itemImage");
-  const imageFile = imageFileInput ? imageFileInput.files[0] : null;
-
-  let image = imageUrlInput;
-
-  if (imageFile) {
-    if (imageFile.size > 1024 * 1024) {
-      showToast("Uploaded image file is over 1MB. Please use an Image URL or smaller file.", "error");
-      return;
-    }
-    try {
-      image = await readImageAsDataUrl(imageFile);
-    } catch (error) {
-      showToast("Could not read selected image file.", "error");
-      return;
-    }
-  }
-
-  if (!image) {
-    image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80";
-  }
-
-  const newItem = {
-    id: Date.now().toString(),
-    name,
-    category,
-    price,
-    badge,
-    desc: desc || "Freshly prepared delicious item.",
-    image,
-    available: true
-  };
-
-  await DataService.addItem(newItem);
-  event.target.reset();
-  await renderAdminMenu();
-  showToast(`Added "${name}" to menu!`);
-}
-
-async function resetToDefaultMenu() {
-  if (confirm("Reset menu to original sample items?")) {
-    await DataService.saveMenuItems(defaultMenu);
-    if (document.getElementById("adminMenuList")) renderAdminMenu();
-    if (document.getElementById("customerMenu")) renderCustomerMenu();
-    showToast("Menu reset to sample data!");
-  }
-}
-
-// Global initialization
-document.addEventListener("DOMContentLoaded", () => {
-  detectTableFromUrl();
-  DataService.subscribeToRealtime();
-});
-EOF
-}
+  set
