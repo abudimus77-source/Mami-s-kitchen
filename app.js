@@ -321,9 +321,6 @@ const DataService = {
           currentMenuItems = data.map(item => ({
             id: String(item.id),
             name: item.name || 'Untitled Item',
-            category:item => ({
-            id: String(item.id),
-            name: item.name || 'Untitled Item',
             category: item.category || 'Main',
             price: parseFloat(item.price) || 0,
             image: item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80',
@@ -495,4 +492,1001 @@ const DataService = {
 
     const orders = await this.fetchOrders();
     const updated = orders.filter(o => o.status !== "Completed" && o.status !== "Cancelled");
-    localStorage.setItem(ORDERS_STORAGE_KEY, JSON
+    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(updated));
+    if (syncChannel) syncChannel.postMessage("orders_updated");
+  },
+
+  // --- WAITER CALL & BILL REQUESTS ---
+  async createWaiterRequest(tableNumber, type) {
+    const reqData = {
+      id: Date.now().toString(),
+      tableNumber,
+      requestType: type,
+      status: 'Pending',
+      createdAt: new Date().toISOString()
+    };
+
+    if (supabaseClient) {
+      const { error } = await supabaseClient.from("waiter_requests").insert([{
+        table_number: tableNumber,
+        request_type: type,
+        status: "Pending"
+      }]);
+      if (error) console.warn("Waiter request insert error:", error);
+    }
+
+    const saved = localStorage.getItem(WAITER_STORAGE_KEY);
+    const requests = saved ? JSON.parse(saved) : [];
+    requests.unshift(reqData);
+    localStorage.setItem(WAITER_STORAGE_KEY, JSON.stringify(requests));
+
+    if (syncChannel) syncChannel.postMessage("waiter_updated");
+    return reqData;
+  },
+
+  async fetchWaiterRequests() {
+    if (supabaseClient) {
+      try {
+        const { data, error } = await supabaseClient
+          .from("waiter_requests")
+          .select("*")
+          .eq("status", "Pending")
+          .order("created_at", { ascending: false });
+
+        if (!error && data) {
+          currentWaiterRequests = data.map(r => ({
+            id: String(r.id),
+            tableNumber: r.table_number,
+            requestType: r.request_type,
+            status: r.status,
+            createdAt: r.created_at
+          }));
+          return currentWaiterRequests;
+        }
+      } catch(e){}
+    }
+
+    const saved = localStorage.getItem(WAITER_STORAGE_KEY);
+    try {
+      currentWaiterRequests = saved ? JSON.parse(saved).filter(r => r.status === 'Pending') : [];
+    } catch (e) {
+      currentWaiterRequests = [];
+    }
+    return currentWaiterRequests;
+  },
+
+  async resolveWaiterRequest(reqId) {
+    if (supabaseClient) {
+      await supabaseClient.from("waiter_requests").update({ status: "Resolved" }).eq("id", reqId);
+    }
+    const saved = localStorage.getItem(WAITER_STORAGE_KEY);
+    if (saved) {
+      const requests = JSON.parse(saved);
+      const req = requests.find(r => String(r.id) === String(reqId));
+      if (req) req.status = 'Resolved';
+      localStorage.setItem(WAITER_STORAGE_KEY, JSON.stringify(requests));
+    }
+    if (syncChannel) syncChannel.postMessage("waiter_updated");
+  },
+
+  async toggleAvailability(itemId) {
+    const items = await this.fetchMenuItems();
+    const item = items.find(i => String(i.id) === String(itemId));
+    if (!item) return;
+
+    const newAvailable = !item.available;
+    item.available = newAvailable;
+
+    if (supabaseClient) {
+      await supabaseClient.from("menu_items").update({ available: newAvailable }).eq("id", itemId);
+    }
+    await this.saveMenuItems(items);
+  },
+
+  async updatePrice(itemId, newPrice) {
+    const items = await this.fetchMenuItems();
+    const item = items.find(i => String(i.id) === String(itemId));
+    if (!item) return;
+
+    const parsedPrice = parseFloat(newPrice) || 0;
+    item.price = parsedPrice;
+
+    if (supabaseClient) {
+      await supabaseClient.from("menu_items").update({ price: parsedPrice }).eq("id", itemId);
+    }
+    await this.saveMenuItems(items);
+  },
+
+  async deleteItem(itemId) {
+    if (supabaseClient) {
+      await supabaseClient.from("menu_items").delete().eq("id", itemId);
+    }
+    const items = await this.fetchMenuItems();
+    const updated = items.filter(i => String(i.id) !== String(itemId));
+    await this.saveMenuItems(updated);
+  },
+
+  async addItem(itemData) {
+    if (supabaseClient) {
+      const { data, error } = await supabaseClient
+        .from("menu_items")
+        .insert([{
+          name: itemData.name,
+          category: itemData.category,
+          price: itemData.price,
+          badge: itemData.badge,
+          description: itemData.desc,
+          image: itemData.image,
+          available: true
+        }])
+        .select();
+
+      if (!error && data && data.length > 0) {
+        await this.fetchMenuItems();
+        return;
+      }
+    }
+
+    const items = await this.fetchMenuItems();
+    items.unshift(itemData);
+    await this.saveMenuItems(items);
+  },
+
+  subscribeToRealtime() {
+    if (!supabaseClient) return;
+
+    supabaseClient
+      .channel("public:orders")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, async (payload) => {
+        if (payload.eventType === "INSERT") {
+          if (document.getElementById("adminOrdersList")) {
+            showToast(`🔔 New Order from Table ${payload.new.table_number || 'N/A'} (${payload.new.customer_name || 'Guest'})!`);
+            try {
+              const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+              audio.play().catch(() => {});
+            } catch(e){}
+          }
+        }
+        await DataService.fetchOrders();
+        if (document.getElementById("adminOrdersList")) renderAdminOrders();
+        if (document.getElementById("activeOrderTracker")) renderCustomerOrderTracker();
+        if (document.getElementById("analyticsContainer")) renderAdminAnalytics();
+      })
+      .subscribe();
+
+    supabaseClient
+      .channel("public:waiter_requests")
+      .on("postgres_changes", { event: "*", schema: "public", table: "waiter_requests" }, async (payload) => {
+        if (payload.eventType === "INSERT") {
+          if (document.getElementById("adminOrdersList")) {
+            const reqLabel = payload.new.request_type === 'request_bill' ? '🧾 Requesting Bill' : '🔔 Calling Waiter';
+            showToast(`⚠️ Table ${payload.new.table_number || 'N/A'} is ${reqLabel}!`, "error");
+            try {
+              const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+              audio.play().catch(() => {});
+            } catch(e){}
+          }
+        }
+        await DataService.fetchWaiterRequests();
+        if (document.getElementById("adminWaiterRequestsList")) renderAdminWaiterRequests();
+      })
+      .subscribe();
+
+    supabaseClient
+      .channel("public:menu_items")
+      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, async () => {
+        await DataService.fetchMenuItems();
+        if (document.getElementById("customerMenu")) renderCustomerMenu();
+        if (document.getElementById("adminMenuList")) renderAdminMenu();
+      })
+      .subscribe();
+  }
+};
+
+// --- DIGITAL WAITER CALLING & BILL REQUEST HANDLERS ---
+async function handleCustomerWaiterAction(type) {
+  const tableInput = document.getElementById("tableNumber");
+  let tableNumber = tableInput ? tableInput.value.trim() : "";
+
+  if (!tableNumber) {
+    tableNumber = sessionStorage.getItem("detected_table_number");
+  }
+
+  if (!tableNumber) {
+    tableNumber = prompt("Please enter your Table Number:");
+    if (!tableNumber) return;
+    sessionStorage.setItem("detected_table_number", tableNumber);
+    if (tableInput) tableInput.value = tableNumber;
+  }
+
+  await DataService.createWaiterRequest(tableNumber, type);
+
+  const actionText = type === 'request_bill' ? 'Receipt/Bill Requested' : 'Waiter Called';
+  showToast(`🔔 Table ${escapeHtml(tableNumber)}: ${actionText}! Staff has been notified.`);
+}
+
+async function renderAdminWaiterRequests() {
+  const container = document.getElementById("adminWaiterRequestsList");
+  if (!container) return;
+
+  const requests = await DataService.fetchWaiterRequests();
+
+  if (requests.length === 0) {
+    container.style.display = "none";
+    return;
+  }
+
+  container.style.display = "block";
+  container.innerHTML = `
+    <div class="glass-card waiter-alerts-card" style="margin-bottom: 20px; border-color: rgba(245,158,11,0.5);">
+      <div class="section-header" style="margin-bottom: 10px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span class="eyebrow" style="color:var(--primary);"><i class="fa-solid fa-bell-concierge"></i> Table Alerts (${requests.length})</span>
+        </div>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px;">
+        ${requests.map(req => {
+          const isBill = req.requestType === 'request_bill';
+          const badgeText = isBill ? '🧾 Requesting Bill' : '🔔 Called Waiter';
+          return `
+            <div class="waiter-alert-chip">
+              <strong>📍 Table ${escapeHtml(req.tableNumber)}</strong>
+              <span>${badgeText}</span>
+              <button type="button" class="btn-primary small" style="padding:4px 10px; font-size:0.75rem;" onclick="handleResolveWaiterRequest('${escapeHtml(req.id)}')">
+                <i class="fa-solid fa-check"></i> Resolve
+              </button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+async function handleResolveWaiterRequest(reqId) {
+  await DataService.resolveWaiterRequest(reqId);
+  await renderAdminWaiterRequests();
+  showToast("Waiter alert resolved!");
+}
+
+// --- SALES & REVENUE ANALYTICS ENGINE ---
+async function renderAdminAnalytics() {
+  const container = document.getElementById("analyticsContainer");
+  if (!container) return;
+
+  const orders = await DataService.fetchOrders();
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const todayOrders = orders.filter(o => {
+    const orderDate = new Date(o.createdAt || Date.now()).toISOString().split('T')[0];
+    return orderDate === todayStr && o.status !== 'Cancelled';
+  });
+
+  const totalRevenueToday = todayOrders.reduce((sum, o) => sum + (parseFloat(o.subtotal) || 0), 0);
+  const totalOrdersCountToday = todayOrders.length;
+  const avgOrderValueToday = totalOrdersCountToday > 0 ? (totalRevenueToday / totalOrdersCountToday) : 0;
+
+  const dishCounts = {};
+  todayOrders.forEach(order => {
+    if (Array.isArray(order.items)) {
+      order.items.forEach(item => {
+        const name = item.name || 'Unknown Item';
+        const qty = parseInt(item.quantity) || 1;
+        dishCounts[name] = (dishCounts[name] || 0) + qty;
+      });
+    }
+  });
+
+  let topDishName = "None Yet";
+  let topDishCount = 0;
+  for (const [name, count] of Object.entries(dishCounts)) {
+    if (count > topDishCount) {
+      topDishName = name;
+      topDishCount = count;
+    }
+  }
+
+  const hourBuckets = { "Lunch (12PM - 3PM)": 0, "Afternoon (3PM - 6PM)": 0, "Dinner (6PM - 10PM)": 0, "Late/Other": 0 };
+  todayOrders.forEach(order => {
+    const hour = new Date(order.createdAt || Date.now()).getHours();
+    if (hour >= 12 && hour < 15) hourBuckets["Lunch (12PM - 3PM)"]++;
+    else if (hour >= 15 && hour < 18) hourBuckets["Afternoon (3PM - 6PM)"]++;
+    else if (hour >= 18 && hour < 22) hourBuckets["Dinner (6PM - 10PM)"]++;
+    else hourBuckets["Late/Other"]++;
+  });
+
+  container.innerHTML = `
+    <div class="stats-grid" style="margin-bottom: 24px;">
+      <article class="glass-card stat-card" style="border-color: rgba(16,185,129,0.4);">
+        <div class="stat-icon active"><i class="fa-solid fa-money-bill-wave"></i></div>
+        <div>
+          <div class="stat-value" style="color:var(--success);">Br ${totalRevenueToday.toFixed(0)}</div>
+          <div class="stat-label">Daily Revenue Today</div>
+        </div>
+      </article>
+
+      <article class="glass-card stat-card">
+        <div class="stat-icon total"><i class="fa-solid fa-bag-shopping"></i></div>
+        <div>
+          <div class="stat-value">${totalOrdersCountToday}</div>
+          <div class="stat-label">Orders Placed Today</div>
+        </div>
+      </article>
+
+      <article class="glass-card stat-card" style="border-color: rgba(245,158,11,0.4);">
+        <div class="stat-icon avg"><i class="fa-solid fa-crown"></i></div>
+        <div>
+          <div class="stat-value" style="font-size:1.1rem; color:var(--primary); line-clamp:1; -webkit-line-clamp:1;">${escapeHtml(topDishName)}</div>
+          <div class="stat-label">Top Dish (${topDishCount} sold)</div>
+        </div>
+      </article>
+
+      <article class="glass-card stat-card">
+        <div class="stat-icon avg"><i class="fa-solid fa-calculator"></i></div>
+        <div>
+          <div class="stat-value">Br ${avgOrderValueToday.toFixed(0)}</div>
+          <div class="stat-label">Avg Order Value</div>
+        </div>
+      </article>
+    </div>
+
+    <div class="glass-card add-item-card" style="margin-bottom: 24px;">
+      <div class="section-header">
+        <div>
+          <p class="eyebrow"><i class="fa-solid fa-clock"></i> Ordering Time Analytics</p>
+          <h3 class="section-title">Peak Ordering Hours Today</h3>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:14px; margin-top:10px;">
+        ${Object.entries(hourBuckets).map(([period, count]) => {
+          const pct = totalOrdersCountToday > 0 ? Math.round((count / totalOrdersCountToday) * 100) : 0;
+          return `
+            <div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.88rem; color:var(--text-main);">
+                <span>${period}</span>
+                <strong>${count} orders (${pct}%)</strong>
+              </div>
+              <div class="tracker-progress-wrap" style="height:10px;">
+                <div class="tracker-progress-bar" style="width: ${pct}%;"></div>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// --- CART MANAGEMENT ---
+function getCart() {
+  try {
+    const saved = localStorage.getItem(CART_STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) { return []; }
+}
+
+function saveCart(cart) {
+  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+}
+
+function getCartItemsWithDetails() {
+  const cart = getCart();
+  return cart
+    .map(entry => {
+      const item = currentMenuItems.find(menuItem => String(menuItem.id) === String(entry.id));
+      return item ? { ...item, quantity: entry.quantity || 1 } : null;
+    })
+    .filter(Boolean);
+}
+
+function addToCart(id) {
+  const item = currentMenuItems.find(menuItem => String(menuItem.id) === String(id));
+  if (!item) return;
+
+  const cart = getCart();
+  const existing = cart.find(entry => String(entry.id) === String(id));
+
+  if (existing) { existing.quantity += 1; } 
+  else { cart.push({ id, quantity: 1 }); }
+
+  saveCart(cart);
+  renderCart();
+  renderCustomerMenu();
+  showToast(`${item.name} added to your order`);
+}
+
+function updateCartQuantity(id, delta) {
+  const cart = getCart();
+  const entry = cart.find(item => String(item.id) === String(id));
+  if (!entry) return;
+
+  entry.quantity += delta;
+  if (entry.quantity <= 0) {
+    saveCart(cart.filter(item => String(item.id) !== String(id)));
+  } else {
+    saveCart(cart);
+  }
+
+  renderCart();
+  renderCustomerMenu();
+}
+
+function removeFromCart(id) {
+  saveCart(getCart().filter(item => String(item.id) !== String(id)));
+  renderCart();
+  renderCustomerMenu();
+}
+
+function getCartSubtotal(items) {
+  return items.reduce((total, item) => total + (parseFloat(item.price) || 0) * item.quantity, 0);
+}
+
+function setServiceMode(mode) {
+  selectedServiceMode = mode;
+  document.querySelectorAll('.service-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.dataset.mode === mode);
+  });
+
+  const tableRow = document.getElementById('tableRow');
+  if (tableRow) tableRow.style.display = mode === 'dine-in' ? 'flex' : 'none';
+}
+
+function renderCart() {
+  const cartItems = getCartItemsWithDetails();
+  const countPill = document.getElementById("cartCountPill");
+  const totalEl = document.getElementById("cartTotal");
+  const container = document.getElementById("cartItemsList");
+  const placeOrderBtn = document.querySelector(".order-btn");
+
+  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const subtotalFormatted = `Br ${getCartSubtotal(cartItems).toFixed(0)}`;
+
+  if (countPill) {
+    const itemLabel = totalItems === 1 ? t("itemText") : t("itemsText");
+    countPill.innerText = `${totalItems} ${itemLabel}`;
+  }
+
+  if (totalEl) totalEl.innerText = subtotalFormatted;
+
+  const mobileBar = document.getElementById("mobileCartBar");
+  const mobileBadge = document.getElementById("mobileCartBadge");
+  const mobileTotal = document.getElementById("mobileCartTotal");
+
+  if (mobileBar && mobileBadge && mobileTotal) {
+    mobileBadge.innerText = totalItems;
+    mobileTotal.innerText = subtotalFormatted;
+    if (totalItems > 0) {
+      mobileBar.classList.add("active");
+    } else {
+      mobileBar.classList.remove("active");
+    }
+  }
+
+  if (!container) return;
+
+  if (cartItems.length === 0) {
+    container.innerHTML = `<div class="empty-cart">${t("emptyCartMsg")}</div>`;
+    if (placeOrderBtn) placeOrderBtn.disabled = true;
+    return;
+  }
+
+  if (placeOrderBtn) placeOrderBtn.disabled = false;
+
+  container.innerHTML = cartItems.map(item => `
+    <div class="cart-item">
+      <div>
+        <div class="cart-item-name">${escapeHtml(item.name)}</div>
+        <div class="cart-item-meta">Br ${parseFloat(item.price).toFixed(0)}</div>
+      </div>
+      <div class="cart-item-controls">
+        <button class="cart-qty-btn" onclick="updateCartQuantity('${escapeHtml(item.id)}', -1)">−</button>
+        <span>${item.quantity}</span>
+        <button class="cart-qty-btn" onclick="updateCartQuantity('${escapeHtml(item.id)}', 1)">+</button>
+      </div>
+      <button class="cart-remove-btn" onclick="removeFromCart('${escapeHtml(item.id)}')" title="Remove item">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  `).join("");
+}
+
+// --- ORDER PLACEMENT ---
+async function placeOrder() {
+  const cartItems = getCartItemsWithDetails();
+  if (cartItems.length === 0) {
+    showToast("Add something to your order first.", "error");
+    return;
+  }
+
+  const customerName = document.getElementById("customerName")?.value?.trim() || "Guest";
+  const notes = document.getElementById("orderNotes")?.value?.trim() || "";
+  const tableNumber = document.getElementById("tableNumber")?.value?.trim() || sessionStorage.getItem("detected_table_number") || "";
+  const subtotal = getCartSubtotal(cartItems);
+  const serviceLabel = selectedServiceMode === 'takeaway' ? t("takeaway") : t("dineIn");
+  const locationText = selectedServiceMode === 'dine-in' && tableNumber ? ` • ${t("tableLabel")} ${escapeHtml(tableNumber)}` : '';
+
+  const newOrder = {
+    id: Date.now().toString(),
+    customerName,
+    serviceMode: selectedServiceMode,
+    tableNumber,
+    notes,
+    items: cartItems.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
+    subtotal,
+    status: 'Pending',
+    createdAt: new Date().toISOString()
+  };
+
+  const created = await DataService.createOrder(newOrder);
+
+  saveCart([]);
+  renderCart();
+  renderCustomerMenu();
+  toggleMobileCart(false);
+  renderCustomerOrderTracker();
+
+  if (document.getElementById("customerName")) document.getElementById("customerName").value = "";
+  if (document.getElementById("orderNotes")) document.getElementById("orderNotes").value = "";
+
+  showToast(`Order placed for ${escapeHtml(customerName)} via ${serviceLabel}! Total Br ${subtotal.toFixed(0)}${locationText}`);
+}
+
+// --- REAL-TIME CUSTOMER ORDER PROGRESS TRACKER ---
+async function renderCustomerOrderTracker() {
+  const trackerContainer = document.getElementById("activeOrderTracker");
+  if (!trackerContainer) return;
+
+  const activeOrderId = localStorage.getItem(ACTIVE_ORDER_ID_KEY);
+  if (!activeOrderId) {
+    trackerContainer.style.display = "none";
+    return;
+  }
+
+  const orders = await DataService.fetchOrders();
+  const activeOrder = orders.find(o => String(o.id) === String(activeOrderId));
+
+  if (!activeOrder || activeOrder.status === 'Completed' || activeOrder.status === 'Cancelled') {
+    trackerContainer.style.display = "none";
+    return;
+  }
+
+  trackerContainer.style.display = "block";
+
+  const status = activeOrder.status || 'Pending';
+  let progressPercent = 25;
+  let statusText = "Order Received by Kitchen";
+  let statusIcon = "fa-receipt";
+  let statusBadgeClass = "pending";
+
+  if (status === 'Preparing') {
+    progressPercent = 65;
+    statusText = "Chef is Preparing Your Meal";
+    statusIcon = "fa-fire-burner";
+    statusBadgeClass = "preparing";
+  } else if (status === 'Ready') {
+    progressPercent = 100;
+    statusText = "Order Ready to Serve!";
+    statusIcon = "fa-bell-concierge";
+    statusBadgeClass = "ready";
+  }
+
+  trackerContainer.innerHTML = `
+    <div class="glass-card tracker-card">
+      <div class="tracker-header">
+        <div>
+          <span class="eyebrow"><i class="fa-solid ${statusIcon}"></i> Live Order Progress</span>
+          <h4>📍 ${t("tableLabel")} ${escapeHtml(activeOrder.tableNumber || 'N/A')} (${escapeHtml(activeOrder.customerName || 'Guest')})</h4>
+        </div>
+        <span class="order-status ${statusBadgeClass}">${escapeHtml(status)}</span>
+      </div>
+      
+      <div class="tracker-progress-wrap">
+        <div class="tracker-progress-bar" style="width: ${progressPercent}%;"></div>
+      </div>
+
+      <div class="tracker-footer">
+        <span>${escapeHtml(statusText)}</span>
+        <strong>Br ${parseFloat(activeOrder.subtotal).toFixed(0)}</strong>
+      </div>
+    </div>
+  `;
+}
+
+// --- ADMIN ORDER DELETION & CLEANING HANDLERS ---
+async function handleDeleteOrder(orderId) {
+  if (confirm("Delete this order record from database?")) {
+    await DataService.deleteOrder(orderId);
+    await renderAdminOrders();
+    showToast("Order deleted!");
+  }
+}
+
+async function handleClearCompletedOrders() {
+  if (confirm("Clear all completed and cancelled orders from queue?")) {
+    await DataService.clearCompletedOrders();
+    await renderAdminOrders();
+    showToast("Completed orders cleared!");
+  }
+}
+
+// --- SEARCH & FILTER ---
+function filterCategory(cat) {
+  selectedCategory = cat;
+  document.querySelectorAll("#categoryNav .cat-btn").forEach(btn => {
+    const isTarget = (cat === "All" && btn.innerText.includes("All")) || 
+      (cat === "Main" && (btn.innerText.includes("Main") || btn.innerText.includes("ዋና"))) ||
+      (cat === "Drinks" && (btn.innerText.includes("Drink") || btn.innerText.includes("መጠጥ"))) ||
+      (cat === "Dessert" && (btn.innerText.includes("Dessert") || btn.innerText.includes("ጣፋጭ")));
+    btn.classList.toggle("active", isTarget);
+  });
+  renderCustomerMenu();
+}
+
+function handleSearch(query) {
+  searchQuery = query.toLowerCase().trim();
+  renderCustomerMenu();
+}
+
+function handleAdminSearch(query) {
+  adminSearchQuery = query.toLowerCase().trim();
+  renderAdminMenu();
+}
+
+function updateCategoryCounts(allItems) {
+  const availableItems = allItems.filter(i => i.available !== false && i.available !== "false");
+  const countAll = document.getElementById("countAll");
+  const countMain = document.getElementById("countMain");
+  const countDrinks = document.getElementById("countDrinks");
+  const countDessert = document.getElementById("countDessert");
+
+  if (countAll) countAll.innerText = availableItems.length;
+  if (countMain) countMain.innerText = availableItems.filter(i => i.category === "Main").length;
+  if (countDrinks) countDrinks.innerText = availableItems.filter(i => i.category === "Drinks").length;
+  if (countDessert) countDessert.innerText = availableItems.filter(i => i.category === "Dessert").length;
+}
+
+// --- RENDER CUSTOMER MENU ---
+async function renderCustomerMenu() {
+  const container = document.getElementById("customerMenu");
+  if (!container) return;
+
+  const allItems = await DataService.fetchMenuItems();
+  renderCart();
+  setServiceMode(selectedServiceMode);
+  updateCategoryCounts(allItems);
+  renderCustomerOrderTracker();
+
+  const filteredItems = allItems.filter(item => {
+    const isAvailable = item.available !== false && item.available !== "false";
+    const cat = item.category ? item.category.toLowerCase().trim() : "";
+    const selCat = selectedCategory.toLowerCase().trim();
+
+    const matchesCat = selectedCategory === "All" || 
+      cat === selCat || 
+      (selCat === "main" && cat.includes("main")) ||
+      (selCat === "drinks" && (cat.includes("drink") || cat.includes("beverage"))) ||
+      (selCat === "dessert" && cat.includes("dessert"));
+
+    const matchesSearch = !searchQuery || 
+      item.name.toLowerCase().includes(searchQuery) || 
+      (item.desc && item.desc.toLowerCase().includes(searchQuery));
+
+    return isAvailable && matchesCat && matchesSearch;
+  });
+
+  if (filteredItems.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon"><i class="fa-solid fa-plate-wheat"></i></div>
+        <h3>No Menu Items Found</h3>
+        <p>Try searching for something else or changing categories.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filteredItems.map(item => `
+    <div class="glass-card card" onclick="openItemModal('${escapeHtml(item.id)}')">
+      <div class="card-image-wrap">
+        <img src="${escapeHtml(item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80')}" alt="${escapeHtml(item.name)}">
+        ${item.badge ? `<div class="badge-tag">${escapeHtml(item.badge)}</div>` : ''}
+      </div>
+      <div class="card-body">
+        <div class="card-header">
+          <div class="card-title">${escapeHtml(item.name)}</div>
+          <div class="card-desc">${escapeHtml(item.desc || 'Freshly prepared delicious item.')}</div>
+        </div>
+        <div class="card-footer">
+          <div class="card-price">Br ${parseFloat(item.price).toFixed(0)}</div>
+          <div class="card-actions">
+            <button class="btn-detail" onclick="event.stopPropagation(); openItemModal('${escapeHtml(item.id)}')">
+              <i class="fa-solid fa-eye"></i> ${t("detailsBtn")}
+            </button>
+            <button class="btn-order" onclick="event.stopPropagation(); addToCart('${escapeHtml(item.id)}')">
+              ${t("addBtn")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join("");
+}
+
+// --- MODAL ---
+function openItemModal(id) {
+  const item = currentMenuItems.find(i => String(i.id) === String(id));
+  if (!item) return;
+
+  document.getElementById("modalImg").src = item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80';
+  document.getElementById("modalTitle").innerText = item.name;
+  document.getElementById("modalDesc").innerText = item.desc || 'Fresh gourmet dish prepared with finest ingredients.';
+  document.getElementById("modalPrice").innerText = `Br ${parseFloat(item.price).toFixed(0)}`;
+
+  const addButton = document.getElementById("modalAddToOrder");
+  if (addButton) {
+    addButton.innerText = t("addBtn");
+    addButton.onclick = () => {
+      addToCart(item.id);
+      closeItemModal();
+    };
+  }
+  
+  const badgeEl = document.getElementById("modalBadge");
+  if (badgeEl) badgeEl.innerText = item.badge || item.category;
+
+  const modal = document.getElementById("itemModal");
+  if (modal) modal.classList.add("active");
+}
+
+function closeItemModal() {
+  const modal = document.getElementById("itemModal");
+  if (modal) modal.classList.remove("active");
+}
+
+function closeModalOnBackdrop(event) {
+  if (event.target.id === "itemModal") closeItemModal();
+}
+
+// --- ADMIN CONTROL CENTER ---
+function updateAdminStats(items) {
+  const total = items.length;
+  const active = items.filter(i => i.available !== false && i.available !== "false").length;
+  const sold = total - active;
+  const avg = total > 0 ? (items.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0) / total) : 0;
+
+  const totalEl = document.getElementById("statTotalItems");
+  const activeEl = document.getElementById("statActiveItems");
+  const soldEl = document.getElementById("statSoldOutItems");
+  const avgEl = document.getElementById("statAvgPrice");
+
+  if (totalEl) totalEl.innerText = total;
+  if (activeEl) activeEl.innerText = active;
+  if (soldEl) soldEl.innerText = sold;
+  if (avgEl) avgEl.innerText = `Br ${avg.toFixed(0)}`;
+}
+
+async function handleOrderStatusChange(id, status) {
+  await DataService.updateOrderStatus(id, status);
+  await renderAdminOrders();
+  showToast(`Order status updated to ${status}`);
+}
+
+async function renderAdminOrders() {
+  const container = document.getElementById("adminOrdersList");
+  if (!container) return;
+
+  await renderAdminWaiterRequests();
+  const orders = await DataService.fetchOrders();
+
+  if (orders.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state glass-card">
+        <div class="empty-state-icon"><i class="fa-solid fa-receipt"></i></div>
+        <h3>No Incoming Orders Yet</h3>
+        <p>Customer orders will stream here in real-time as soon as they place one.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = orders.map(order => {
+    const subtotal = order.items.reduce((total, item) => total + (parseFloat(item.price) || 0) * item.quantity, 0);
+    const statusClass = escapeHtml((order.status || 'Pending').toLowerCase());
+    const tableDisplay = order.tableNumber ? `${t("tableLabel")} ${escapeHtml(order.tableNumber)}` : 'No Table #';
+    const serviceLabel = order.serviceMode === 'takeaway' ? `🥡 ${t("takeaway")}` : `🍽️ ${t("dineIn")}`;
+
+    return `
+      <div class="glass-card order-card-admin">
+        <div class="order-admin-header">
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div class="table-badge-prominent">
+              <i class="fa-solid fa-chair"></i> ${tableDisplay}
+            </div>
+            <div>
+              <h4 style="margin:0;">${escapeHtml(order.customerName || 'Guest')}</h4>
+              <p style="margin:0; font-size:0.82rem; color:var(--text-muted);">${serviceLabel}</p>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="order-status ${statusClass}">${escapeHtml(order.status || 'Pending')}</span>
+            <button class="btn-delete small" onclick="handleDeleteOrder('${escapeHtml(order.id)}')" title="Delete Order Record">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="order-admin-items">
+          ${order.items.map(item => `<div class="order-admin-item"><strong>${item.quantity}×</strong> ${escapeHtml(item.name)}</div>`).join('')}
+        </div>
+
+        <div class="order-admin-footer">
+          <div>
+            <strong>Br ${subtotal.toFixed(0)}</strong>
+            ${order.notes ? `<div class="order-notes">💬 ${escapeHtml(order.notes)}</div>` : ''}
+          </div>
+          <div class="order-admin-actions">
+            <button class="btn-order small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Preparing')">👨‍🍳 ${t("preparing")}</button>
+            <button class="btn-detail small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Ready')">🔔 ${t("ready")}</button>
+            <button class="btn-complete small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Completed')">✅ ${t("completed")}</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function renderAdminMenu() {
+  const container = document.getElementById("adminMenuList");
+  if (!container) return;
+
+  const items = await DataService.fetchMenuItems();
+  updateAdminStats(items);
+  renderAdminOrders();
+
+  const filteredItems = items.filter(item => {
+    return !adminSearchQuery || 
+      item.name.toLowerCase().includes(adminSearchQuery) || 
+      item.category.toLowerCase().includes(adminSearchQuery);
+  });
+
+  if (filteredItems.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state glass-card">
+        <div class="empty-state-icon"><i class="fa-solid fa-folder-open"></i></div>
+        <h3>No Items Found</h3>
+        <p>No menu items match your search filter.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filteredItems.map(item => `
+    <div class="glass-card admin-item-row">
+      <div class="admin-item-info">
+        <img src="${escapeHtml(item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100')}" alt="${escapeHtml(item.name)}">
+        <div class="admin-item-details">
+          <h4>${escapeHtml(item.name)}</h4>
+          <span>${escapeHtml(item.category)} • ${escapeHtml(item.badge || 'Standard')}</span>
+        </div>
+      </div>
+
+      <div class="admin-controls">
+        <div class="price-input-wrap">
+          <span>Br</span>
+          <input 
+            type="number" 
+            step="1" 
+            value="${parseFloat(item.price).toFixed(0)}" 
+            class="price-input" 
+            onchange="handlePriceUpdate('${escapeHtml(item.id)}', this.value)"
+          >
+        </div>
+
+        <label class="switch" title="Toggle Stock (In Stock / Sold Out)">
+          <input 
+            type="checkbox" 
+            ${item.available !== false && item.available !== "false" ? 'checked' : ''} 
+            onchange="handleToggleAvailability('${escapeHtml(item.id)}')"
+          >
+          <span class="slider"></span>
+        </label>
+
+        <button class="btn-delete" onclick="handleDeleteItem('${escapeHtml(item.id)}')" title="Delete Menu Item">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </div>
+    </div>
+  `).join("");
+}
+
+async function handleToggleAvailability(id) {
+  await DataService.toggleAvailability(id);
+  await renderAdminMenu();
+  showToast("Item availability toggled!");
+}
+
+async function handlePriceUpdate(id, newPrice) {
+  await DataService.updatePrice(id, newPrice);
+  await renderAdminMenu();
+  showToast("Item price updated!");
+}
+
+async function handleDeleteItem(id) {
+  if (confirm("Are you sure you want to delete this menu item?")) {
+    await DataService.deleteItem(id);
+    await renderAdminMenu();
+    showToast("Menu item deleted!");
+  }
+}
+
+function readImageAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject("Failed to read image");
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleAddItem(event) {
+  event.preventDefault();
+  const name = document.getElementById("itemName").value.trim();
+  const category = document.getElementById("itemCategory").value;
+  const price = parseFloat(document.getElementById("itemPrice").value);
+  const badge = document.getElementById("itemBadge").value.trim();
+  const desc = document.getElementById("itemDesc").value.trim();
+  const imageUrlInput = document.getElementById("itemImageUrl").value.trim();
+  const imageFileInput = document.getElementById("itemImage");
+  const imageFile = imageFileInput ? imageFileInput.files[0] : null;
+
+  let image = imageUrlInput;
+
+  if (imageFile) {
+    if (imageFile.size > 1024 * 1024) {
+      showToast("Uploaded image file is over 1MB. Please use an Image URL or smaller file.", "error");
+      return;
+    }
+    try {
+      image = await readImageAsDataUrl(imageFile);
+    } catch (error) {
+      showToast("Could not read selected image file.", "error");
+      return;
+    }
+  }
+
+  if (!image) {
+    image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80";
+  }
+
+  const newItem = {
+    id: Date.now().toString(),
+    name,
+    category,
+    price,
+    badge,
+    desc: desc || "Freshly prepared delicious item.",
+    image,
+    available: true
+  };
+
+  await DataService.addItem(newItem);
+  event.target.reset();
+  await renderAdminMenu();
+  showToast(`Added "${name}" to menu!`);
+}
+
+async function resetToDefaultMenu() {
+  if (confirm("Reset menu to original sample items?")) {
+    await DataService.saveMenuItems(defaultMenu);
+    if (document.getElementById("adminMenuList")) renderAdminMenu();
+    if (document.getElementById("customerMenu")) renderCustomerMenu();
+    showToast("Menu reset to sample data!");
+  }
+}
+
+// Global initialization
+document.addEventListener("DOMContentLoaded", () => {
+  detectTableFromUrl();
+  applyTranslations();
+  DataService.subscribeToRealtime();
+});
