@@ -326,7 +326,8 @@ const DataService = {
             image: item.image,
             badge: item.badge,
             desc: item.description,
-            available: item.available
+            // Ensure available is true unless explicitly false or "false"
+            available: item.available !== false && item.available !== "false"
           }));
           return currentMenuItems;
         }
@@ -627,7 +628,6 @@ const DataService = {
   subscribeToRealtime() {
     if (!supabaseClient) return;
 
-    // Realtime channel for orders
     supabaseClient
       .channel("public:orders")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, async (payload) => {
@@ -647,7 +647,6 @@ const DataService = {
       })
       .subscribe();
 
-    // Realtime channel for waiter requests
     supabaseClient
       .channel("public:waiter_requests")
       .on("postgres_changes", { event: "*", schema: "public", table: "waiter_requests" }, async (payload) => {
@@ -666,7 +665,6 @@ const DataService = {
       })
       .subscribe();
 
-    // Realtime channel for menu updates
     supabaseClient
       .channel("public:menu_items")
       .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, async () => {
@@ -752,7 +750,6 @@ async function renderAdminAnalytics() {
   const orders = await DataService.fetchOrders();
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Filter today's valid orders
   const todayOrders = orders.filter(o => {
     const orderDate = new Date(o.createdAt || Date.now()).toISOString().split('T')[0];
     return orderDate === todayStr && o.status !== 'Cancelled';
@@ -762,7 +759,6 @@ async function renderAdminAnalytics() {
   const totalOrdersCountToday = todayOrders.length;
   const avgOrderValueToday = totalOrdersCountToday > 0 ? (totalRevenueToday / totalOrdersCountToday) : 0;
 
-  // Compute Most Popular Dish of the Day
   const dishCounts = {};
   todayOrders.forEach(order => {
     if (Array.isArray(order.items)) {
@@ -783,7 +779,6 @@ async function renderAdminAnalytics() {
     }
   }
 
-  // Peak Hours Distribution
   const hourBuckets = { "Lunch (12PM - 3PM)": 0, "Afternoon (3PM - 6PM)": 0, "Dinner (6PM - 10PM)": 0, "Late/Other": 0 };
   todayOrders.forEach(order => {
     const hour = new Date(order.createdAt || Date.now()).getHours();
@@ -1128,7 +1123,7 @@ function handleAdminSearch(query) {
 }
 
 function updateCategoryCounts(allItems) {
-  const availableItems = allItems.filter(i => i.available);
+  const availableItems = allItems.filter(i => i.available !== false && i.available !== "false");
   const countAll = document.getElementById("countAll");
   const countMain = document.getElementById("countMain");
   const countDrinks = document.getElementById("countDrinks");
@@ -1152,7 +1147,7 @@ async function renderCustomerMenu() {
   renderCustomerOrderTracker();
 
   const filteredItems = allItems.filter(item => {
-    const isAvailable = item.available;
+    const isAvailable = item.available !== false && item.available !== "false";
     const matchesCat = selectedCategory === "All" || item.category === selectedCategory;
     const matchesSearch = !searchQuery || 
       item.name.toLowerCase().includes(searchQuery) || 
@@ -1236,7 +1231,7 @@ function closeModalOnBackdrop(event) {
 // --- ADMIN CONTROL CENTER ---
 function updateAdminStats(items) {
   const total = items.length;
-  const active = items.filter(i => i.available).length;
+  const active = items.filter(i => i.available !== false && i.available !== "false").length;
   const sold = total - active;
   const avg = total > 0 ? (items.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0) / total) : 0;
 
@@ -1371,7 +1366,7 @@ async function renderAdminMenu() {
         <label class="switch" title="Toggle Stock (In Stock / Sold Out)">
           <input 
             type="checkbox" 
-            ${item.available ? 'checked' : ''} 
+            ${item.available !== false && item.available !== "false" ? 'checked' : ''} 
             onchange="handleToggleAvailability('${escapeHtml(item.id)}')"
           >
           <span class="slider"></span>
