@@ -76,7 +76,7 @@ body {
 }
 
 /* ==========================================
-   HEADER NAVIGATION
+   1. HEADER NAVIGATION & BRAND
    ========================================== */
 
 .header {
@@ -187,8 +187,36 @@ body {
   padding: 0 16px;
 }
 
+/* Language Switcher Component */
+.lang-switcher {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-full);
+  padding: 3px;
+}
+
+.lang-btn {
+  padding: 5px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.lang-btn.active {
+  background: var(--primary);
+  color: #090d16;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
 /* ==========================================
-   CUSTOMER ORDERING CARD & FORM INPUTS
+   2. CUSTOMER ORDERING SHELL & CART DRAWER
    ========================================== */
 
 .ordering-shell {
@@ -414,7 +442,7 @@ body {
 }
 
 /* ==========================================
-   CUSTOMER MENU GRID & CARDS
+   3. CUSTOMER MENU GRID & CARDS
    ========================================== */
 
 .menu-section { min-width: 0; }
@@ -598,12 +626,6 @@ body {
 .card-actions {
   display: flex;
   align-items: center;
-);
-}
-
-.card-actions {
-  display: flex;
-  align-items: center;
   gap: 6px;
   flex-wrap: wrap;
 }
@@ -638,7 +660,7 @@ body {
 }
 
 /* ==========================================
-   CUSTOMER ORDER TRACKER BANNER
+   4. CUSTOMER ORDER TRACKER BANNER
    ========================================== */
 
 .tracker-card {
@@ -686,7 +708,7 @@ body {
 }
 
 /* ==========================================
-   FLOATING MOBILE BARS & WAITER ACTIONS
+   5. FLOATING MOBILE BARS & WAITER ACTIONS
    ========================================== */
 
 .mobile-cart-bar {
@@ -772,10 +794,7 @@ body {
   box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
 }
 
-/* ==========================================
-   MODAL OVERLAY & CARD
-   ========================================== */
-
+/* Modal Styling */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -827,9 +846,4 @@ body {
   right: 12px;
   width: 34px;
   height: 34px;
-  border-radius: 50%;
-  background: rgba(9, 13, 22, 0.8);
-  border: 1px solid var(--border-glass);
-  color: #fff;
-  font-size: 1.1rem;
-  display: flex;
+  border-radius:
