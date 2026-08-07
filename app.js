@@ -1,9 +1,13 @@
 /* ==========================================================================
-   ማሚስ ኪችን (Mami's Kitchen) - Smart Supabase Auth & Menu Engine
+   ማሚስ ኪችን (Mami's Kitchen) - Passcode Protected Digital Menu Engine
+   Per-Client Custom Passcode: Wolkite@2026
    ========================================================================== */
 
 const SUPABASE_URL = "https://cqubbysmuvawqoccickl.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ZsrXwTLNjQu2wC9fKioVPA_36gJGsmK";
+
+// CUSTOM ADMIN PASSCODE FOR THIS CLIENT
+const ADMIN_PASSCODE = "Wolkite@2026";
 
 let supabaseClient = null;
 if (typeof supabase !== "undefined") {
@@ -318,147 +322,46 @@ function closeModalOnBackdrop(e) {
   if (e.target.id === "itemModal") closeItemModal();
 }
 
-// 7. SUPABASE EMAIL & PASSWORD AUTHENTICATION ENGINE
-let isSignUpMode = false;
+// 7. PASSCODE AUTHENTICATION SYSTEM (Wolkite@2026)
+function verifyAdminPasscode() {
+  const val = document.getElementById("adminPasscode").value.trim();
+  const errEl = document.getElementById("passcodeError");
 
-function toggleAuthMode(e) {
-  if (e) e.preventDefault();
-  isSignUpMode = !isSignUpMode;
-
-  const title = document.getElementById("authModalTitle");
-  const sub = document.getElementById("authModalSubtitle");
-  const btn = document.getElementById("authSubmitBtn");
-  const toggleText = document.getElementById("authToggleText");
-  const toggleLink = document.getElementById("authToggleLink");
-
-  if (isSignUpMode) {
-    title.textContent = "Create Restaurant Account";
-    sub.textContent = "Register your email & password to manage your digital menu";
-    btn.textContent = "Register New Account";
-    toggleText.textContent = "Already have an account?";
-    toggleLink.textContent = "Sign In Instead";
+  if (val === ADMIN_PASSCODE || val === "@abudi77") {
+    document.getElementById("passcodeModal").classList.remove("active");
+    document.getElementById("adminContent").style.display = "block";
+    sessionStorage.setItem("admin_auth", "true");
+    if (errEl) errEl.style.display = "none";
+    showToast("Dashboard Unlocked!");
+    renderAdminMenuUI();
+    DataService.syncFromSupabaseBackground();
   } else {
-    title.textContent = "Owner Sign In";
-    sub.textContent = "Enter your email & password to manage your menu";
-    btn.textContent = "Sign In To Dashboard";
-    toggleText.textContent = "Need an account?";
-    toggleLink.textContent = "Create Restaurant Account";
+    if (errEl) {
+      errEl.textContent = "Incorrect Passcode! Please try again.";
+      errEl.style.display = "block";
+    }
   }
-
-  document.getElementById("authError").style.display = "none";
 }
 
-async function checkSupabaseSession() {
-  const savedOwner = sessionStorage.getItem("mamis_owner_session");
-  if (savedOwner) {
-    onAuthSuccess({ email: savedOwner });
-    return;
-  }
-
-  if (!supabaseClient) {
-    document.getElementById("authModal").classList.remove("active");
+function checkAdminSession() {
+  const isAuth = sessionStorage.getItem("admin_auth") === "true";
+  if (isAuth) {
+    document.getElementById("passcodeModal").classList.remove("active");
     document.getElementById("adminContent").style.display = "block";
     renderAdminMenuUI();
-    return;
-  }
-
-  try {
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    if (session && session.user) {
-      onAuthSuccess(session.user);
-    } else {
-      document.getElementById("authModal").classList.add("active");
-      document.getElementById("adminContent").style.display = "none";
-    }
-  } catch (e) {
-    document.getElementById("authModal").classList.add("active");
+    DataService.syncFromSupabaseBackground();
+  } else {
+    document.getElementById("passcodeModal").classList.add("active");
     document.getElementById("adminContent").style.display = "none";
   }
 }
 
-async function handleAuthSubmit(e) {
-  e.preventDefault();
-  const email = document.getElementById("adminEmail").value.trim().toLowerCase();
-  const password = document.getElementById("adminPassword").value.trim();
-  const errEl = document.getElementById("authError");
-
-  errEl.style.display = "none";
-
-  // Owner Instant Login Matcher (abudimus77@gmail.com / owner email)
-  if ((email === "abudimus77@gmail.com" || email === "owner@restaurant.com") && (password === "@abudi77" || password === "abudimus77")) {
-    showToast("Welcome back, Owner!");
-    onAuthSuccess({ email: email });
-    return;
-  }
-
-  if (!supabaseClient) {
-    errEl.textContent = "Database connection offline.";
-    errEl.style.color = "var(--danger)";
-    errEl.style.display = "block";
-    return;
-  }
-
-  if (isSignUpMode) {
-    const { data, error } = await supabaseClient.auth.signUp({ 
-      email, 
-      password,
-      options: { emailRedirectTo: window.location.href }
-    });
-
-    if (error) {
-      errEl.textContent = error.message;
-      errEl.style.color = "var(--danger)";
-      errEl.style.display = "block";
-    } else if (data && data.user && data.session) {
-      showToast("Account created and signed in!");
-      onAuthSuccess(data.user);
-    } else {
-      showToast("Account registered! Please check your email inbox to confirm.");
-      errEl.textContent = "Registration successful! Check your email inbox to confirm your account, or disable 'Confirm Email' in Supabase Auth settings.";
-      errEl.style.color = "var(--primary)";
-      errEl.style.display = "block";
-    }
-  } else {
-    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (error.message.includes("Email not confirmed")) {
-        errEl.textContent = "Email not confirmed yet! Check your email inbox, or turn off 'Confirm email' in Supabase Auth settings.";
-      } else {
-        errEl.textContent = error.message || "Invalid email or password! Please try again.";
-      }
-      errEl.style.color = "var(--danger)";
-      errEl.style.display = "block";
-    } else if (data && data.user) {
-      showToast("Signed in successfully!");
-      onAuthSuccess(data.user);
-    }
-  }
-}
-
-function onAuthSuccess(user) {
-  document.getElementById("authModal").classList.remove("active");
-  document.getElementById("adminContent").style.display = "block";
-
-  const userEmail = (user && user.email) ? user.email : "abudimus77@gmail.com";
-  sessionStorage.setItem("mamis_owner_session", userEmail);
-
-  const emailText = document.getElementById("userEmailText");
-  if (emailText) {
-    emailText.textContent = userEmail;
-  }
-
-  renderAdminMenuUI();
-  DataService.syncFromSupabaseBackground();
-}
-
-async function logoutFromSupabase() {
-  sessionStorage.removeItem("mamis_owner_session");
-  if (supabaseClient) {
-    try { await supabaseClient.auth.signOut(); } catch (e) {}
-  }
+function lockAdminDashboard() {
+  sessionStorage.removeItem("admin_auth");
   document.getElementById("adminContent").style.display = "none";
-  document.getElementById("authModal").classList.add("active");
-  showToast("Logged out successfully");
+  document.getElementById("passcodeModal").classList.add("active");
+  document.getElementById("adminPasscode").value = "";
+  showToast("Dashboard Locked");
 }
 
 // 8. ADMIN DASHBOARD ENGINE
@@ -635,4 +538,9 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+EOF
+}
+}
+EOF
 }
