@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ማሚስ ኪችን (Mami's Kitchen) - Empty Menu Slate Data Engine
+   ማሚስ ኪችን (Mami's Kitchen) - Smart Supabase Auth & Menu Engine
    ========================================================================== */
 
 const SUPABASE_URL = "https://cqubbysmuvawqoccickl.supabase.co";
@@ -15,7 +15,7 @@ if (typeof supabase !== "undefined") {
   }
 }
 
-// Default initial menu is now EMPTY
+// Default initial menu is empty slate
 const defaultMenu = [];
 
 // 3. I18N BILINGUAL TRANSLATION DICTIONARY
@@ -318,7 +318,7 @@ function closeModalOnBackdrop(e) {
   if (e.target.id === "itemModal") closeItemModal();
 }
 
-// 7. SUPABASE EMAIL & PASSWORD AUTHENTICATION SYSTEM
+// 7. SUPABASE EMAIL & PASSWORD AUTHENTICATION ENGINE
 let isSignUpMode = false;
 
 function toggleAuthMode(e) {
@@ -349,6 +349,12 @@ function toggleAuthMode(e) {
 }
 
 async function checkSupabaseSession() {
+  const savedOwner = sessionStorage.getItem("mamis_owner_session");
+  if (savedOwner) {
+    onAuthSuccess({ email: savedOwner });
+    return;
+  }
+
   if (!supabaseClient) {
     document.getElementById("authModal").classList.remove("active");
     document.getElementById("adminContent").style.display = "block";
@@ -356,10 +362,15 @@ async function checkSupabaseSession() {
     return;
   }
 
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (session && session.user) {
-    onAuthSuccess(session.user);
-  } else {
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session && session.user) {
+      onAuthSuccess(session.user);
+    } else {
+      document.getElementById("authModal").classList.add("active");
+      document.getElementById("adminContent").style.display = "none";
+    }
+  } catch (e) {
     document.getElementById("authModal").classList.add("active");
     document.getElementById("adminContent").style.display = "none";
   }
@@ -367,35 +378,59 @@ async function checkSupabaseSession() {
 
 async function handleAuthSubmit(e) {
   e.preventDefault();
-  const email = document.getElementById("adminEmail").value.trim();
+  const email = document.getElementById("adminEmail").value.trim().toLowerCase();
   const password = document.getElementById("adminPassword").value.trim();
   const errEl = document.getElementById("authError");
 
   errEl.style.display = "none";
 
+  // Owner Instant Login Matcher (abudimus77@gmail.com / owner email)
+  if ((email === "abudimus77@gmail.com" || email === "owner@restaurant.com") && (password === "@abudi77" || password === "abudimus77")) {
+    showToast("Welcome back, Owner!");
+    onAuthSuccess({ email: email });
+    return;
+  }
+
   if (!supabaseClient) {
-    errEl.textContent = "Database connection error.";
+    errEl.textContent = "Database connection offline.";
+    errEl.style.color = "var(--danger)";
     errEl.style.display = "block";
     return;
   }
 
   if (isSignUpMode) {
-    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    const { data, error } = await supabaseClient.auth.signUp({ 
+      email, 
+      password,
+      options: { emailRedirectTo: window.location.href }
+    });
+
     if (error) {
       errEl.textContent = error.message;
+      errEl.style.color = "var(--danger)";
       errEl.style.display = "block";
+    } else if (data && data.user && data.session) {
+      showToast("Account created and signed in!");
+      onAuthSuccess(data.user);
     } else {
-      showToast("Account created! Logging in...");
-      if (data.user) onAuthSuccess(data.user);
+      showToast("Account registered! Please check your email inbox to confirm.");
+      errEl.textContent = "Registration successful! Check your email inbox to confirm your account, or disable 'Confirm Email' in Supabase Auth settings.";
+      errEl.style.color = "var(--primary)";
+      errEl.style.display = "block";
     }
   } else {
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
     if (error) {
-      errEl.textContent = "Invalid email or password! Please try again.";
+      if (error.message.includes("Email not confirmed")) {
+        errEl.textContent = "Email not confirmed yet! Check your email inbox, or turn off 'Confirm email' in Supabase Auth settings.";
+      } else {
+        errEl.textContent = error.message || "Invalid email or password! Please try again.";
+      }
+      errEl.style.color = "var(--danger)";
       errEl.style.display = "block";
-    } else {
-      showToast("Welcome back! Signed in successfully.");
-      if (data.user) onAuthSuccess(data.user);
+    } else if (data && data.user) {
+      showToast("Signed in successfully!");
+      onAuthSuccess(data.user);
     }
   }
 }
@@ -404,9 +439,12 @@ function onAuthSuccess(user) {
   document.getElementById("authModal").classList.remove("active");
   document.getElementById("adminContent").style.display = "block";
 
+  const userEmail = (user && user.email) ? user.email : "abudimus77@gmail.com";
+  sessionStorage.setItem("mamis_owner_session", userEmail);
+
   const emailText = document.getElementById("userEmailText");
-  if (emailText && user && user.email) {
-    emailText.textContent = user.email;
+  if (emailText) {
+    emailText.textContent = userEmail;
   }
 
   renderAdminMenuUI();
@@ -414,8 +452,9 @@ function onAuthSuccess(user) {
 }
 
 async function logoutFromSupabase() {
+  sessionStorage.removeItem("mamis_owner_session");
   if (supabaseClient) {
-    await supabaseClient.auth.signOut();
+    try { await supabaseClient.auth.signOut(); } catch (e) {}
   }
   document.getElementById("adminContent").style.display = "none";
   document.getElementById("authModal").classList.add("active");
