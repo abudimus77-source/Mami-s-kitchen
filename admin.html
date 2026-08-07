@@ -3,41 +3,27 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ማሚስ ኪችን | Owner Login & Control Panel</title>
+  <title>ማሚስ ኪችን | Owner Control Panel</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="style.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <!-- Supabase Email & Password Auth Modal -->
-  <div id="authModal" class="modal-overlay active" style="z-index: 500;">
-    <div class="modal-card" style="padding: 28px; text-align: center; max-width: 400px;">
+  <!-- Passcode Protection Modal -->
+  <div id="passcodeModal" class="modal-overlay active" style="z-index: 500;">
+    <div class="modal-card" style="padding: 28px; text-align: center; max-width: 380px;">
       <div class="brand-icon" style="margin: 0 auto 16px; width: 56px; height: 56px; font-size: 1.6rem;">
-        <i class="fa-solid fa-user-shield"></i>
+        <i class="fa-solid fa-key"></i>
       </div>
-      <h2 id="authModalTitle" style="font-family:'Playfair Display',serif; color:#fff; margin-bottom:6px;">Owner Sign In</h2>
-      <p id="authModalSubtitle" style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">Enter your email & password to manage your menu</p>
+      <h2 style="font-family:'Playfair Display',serif; color:#fff; margin-bottom:6px;">Owner Passcode Login</h2>
+      <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">Enter your restaurant passcode to access menu controls</p>
       
-      <form onsubmit="handleAuthSubmit(event)">
-        <div class="form-row" style="margin-bottom:12px; text-align:left;">
-          <span>Email Address</span>
-          <input type="email" id="adminEmail" placeholder="e.g. owner@restaurant.com" required>
-        </div>
-
-        <div class="form-row" style="margin-bottom:18px; text-align:left;">
-          <span>Password</span>
-          <input type="password" id="adminPassword" placeholder="••••••••" required>
-        </div>
-        
-        <button type="submit" id="authSubmitBtn" class="btn-primary" style="margin-bottom:14px;">Sign In To Dashboard</button>
-      </form>
-
-      <div style="font-size:0.82rem; color:var(--text-muted);">
-        <span id="authToggleText">Need an account?</span> 
-        <a href="#" id="authToggleLink" style="color:var(--primary); font-weight:700; text-decoration:none;" onclick="toggleAuthMode(event)">Create Restaurant Account</a>
+      <div class="form-row" style="margin-bottom:16px;">
+        <input type="password" id="adminPasscode" placeholder="Enter Admin Passcode" style="text-align:center; font-size:1.1rem; letter-spacing:0.15em;" onkeyup="if(event.key==='Enter') verifyAdminPasscode()">
       </div>
-
-      <p id="authError" style="color:var(--danger); font-size:0.82rem; margin-top:14px; display:none;"></p>
+      
+      <button type="button" class="btn-primary" onclick="verifyAdminPasscode()">Unlock Dashboard</button>
+      <p id="passcodeError" style="color:var(--danger); font-size:0.82rem; margin-top:12px; display:none;">Incorrect Passcode! Please try again.</p>
     </div>
   </div>
 
@@ -56,16 +42,20 @@
         </a>
 
         <div style="display:flex; align-items:center; gap:10px;">
-          <span id="userEmailBadge" class="table-badge-header" style="background:rgba(16,185,129,0.15); color:var(--success); border-color:rgba(16,185,129,0.35);">
-            <i class="fa-solid fa-user-check"></i> <span id="userEmailText">owner@restaurant.com</span>
+          <span class="table-badge-header" style="background:rgba(245,158,11,0.15); color:var(--primary); border-color:rgba(245,158,11,0.35);">
+            <i class="fa-solid fa-key"></i> Passcode Protected
           </span>
 
           <a href="index.html" target="_blank" class="nav-link">
             <i class="fa-solid fa-arrow-up-right-from-square"></i> Customer View
           </a>
 
-          <button type="button" class="nav-link" onclick="logoutFromSupabase()" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.4);">
-            <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+          <button type="button" class="nav-link" onclick="clearAllMenuData()" style="color:var(--danger); border-color:rgba(239, 68, 68, 0.4);">
+            <i class="fa-solid fa-trash"></i> Clear All Items
+          </button>
+
+          <button type="button" class="nav-link" onclick="lockAdminDashboard()" style="color:var(--text-muted); border-color:var(--border-glass);">
+            <i class="fa-solid fa-lock"></i> Lock
           </button>
           
           <div class="lang-switcher">
@@ -79,12 +69,12 @@
     <main class="container">
       <section class="admin-hero glass-card">
         <div>
-          <span class="eyebrow">Secure Auth Package • Digital Menu Manager</span>
+          <span class="eyebrow">Passcode Protected • Digital Menu Manager</span>
           <h2>Digital Menu & Price Control Center</h2>
-          <p>Logged in as owner. Easily update prices, toggle availability, and add new dishes.</p>
+          <p>Easily add custom dishes, update prices in 1 second, and toggle stock availability.</p>
         </div>
         <div class="hero-pill-row">
-          <span class="hero-pill"><i class="fa-solid fa-user-lock" style="color:var(--success);"></i> Protected Session</span>
+          <span class="hero-pill"><i class="fa-solid fa-lock" style="color:var(--success);"></i> Session Unlocked</span>
           <span class="hero-pill"><i class="fa-solid fa-box-open" style="color:var(--primary);"></i> Price Control</span>
         </div>
       </section>
@@ -202,7 +192,7 @@
   <script src="app.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
-      checkSupabaseSession();
+      checkAdminSession();
     });
   </script>
 </body>
