@@ -1,6 +1,5 @@
 /* ==========================================================================
-   ማሚስ ኪችን (Mami's Kitchen) - Basic Package Ultra-Fast Data Engine
-   Pure Digital Menu & Price Control System
+   ማሚስ ኪችን (Mami's Kitchen) - Ultra-Fast Data Engine (0.01s Instant Load)
    ========================================================================== */
 
 const SUPABASE_URL = "https://cqubbysmuvawqoccickl.supabase.co";
@@ -10,13 +9,10 @@ let supabaseClient = null;
 if (typeof supabase !== "undefined") {
   try {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    console.log("🟢 Connected to Supabase Cloud Backend");
-  } catch (err) {
-    console.warn("Supabase client init warning:", err);
-  }
+  } catch (err) {}
 }
 
-// 2. DEFAULT INITIAL MENU DATA
+// 2. DEFAULT INITIAL MENU DATA (Instant Fallback)
 const defaultMenu = [
   {
     id: "item_1",
@@ -127,11 +123,11 @@ function setLanguage(lang) {
   const searchInput = document.getElementById("searchInput");
   if (searchInput) searchInput.placeholder = i18n[lang].search_placeholder;
 
-  if (document.getElementById("customerMenu")) renderCustomerMenu();
-  if (document.getElementById("adminMenuList")) renderAdminMenu();
+  if (document.getElementById("customerMenu")) renderCustomerMenuUI();
+  if (document.getElementById("adminMenuList")) renderAdminMenuUI();
 }
 
-// Helper: Flexible Category Normalizer
+// Helper: Normalize category strings
 function normalizeCategory(catStr) {
   if (!catStr) return "Main";
   const c = String(catStr).toLowerCase().trim();
@@ -141,59 +137,68 @@ function normalizeCategory(catStr) {
   return "Main";
 }
 
-// 4. BLAZING FAST IN-MEMORY DATA SERVICE LAYER
+// 4. BLAZING FAST NON-BLOCKING DATA SERVICE LAYER
 let cachedMenu = null;
 
 class DataService {
-  static async getMenuItems(forceRefresh = false) {
-    if (cachedMenu && !forceRefresh) {
+  // Synchronous/instant menu fetch (0ms execution time!)
+  static getMenuItemsSync() {
+    if (cachedMenu && cachedMenu.length > 0) {
       return cachedMenu;
     }
 
-    // 1. Check LocalStorage for 0ms instant display
     const localData = localStorage.getItem("mamis_basic_menu");
-    if (localData && !forceRefresh) {
+    if (localData) {
       try {
         const parsed = JSON.parse(localData);
         if (Array.isArray(parsed) && parsed.length > 0) {
           cachedMenu = parsed.map(i => ({ ...i, category: normalizeCategory(i.category) }));
+          return cachedMenu;
         }
       } catch (e) {}
     }
 
-    if (!cachedMenu) {
-      cachedMenu = defaultMenu;
-    }
+    cachedMenu = defaultMenu;
+    localStorage.setItem("mamis_basic_menu", JSON.stringify(defaultMenu));
+    return defaultMenu;
+  }
 
-    // 2. Fetch from Supabase in background
-    if (supabaseClient) {
-      try {
-        const { data, error } = await supabaseClient.from("menu_items").select("*").order("created_at", { ascending: false });
+  // Non-blocking background Cloud Sync with 2.5s Hard Timeout
+  static async syncFromSupabaseBackground() {
+    if (!supabaseClient) return;
 
-        if (!error && Array.isArray(data) && data.length > 0) {
-          cachedMenu = data.map(item => ({
-            id: String(item.id),
-            name: item.name || "Untitled Item",
-            category: normalizeCategory(item.category),
-            price: Number(item.price) || 0,
-            available: item.available !== false && item.available !== "false",
-            badge: item.badge || "Popular",
-            description: item.description || item.desc || "",
-            image: item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80"
-          }));
-          localStorage.setItem("mamis_basic_menu", JSON.stringify(cachedMenu));
-        } else if (!error && Array.isArray(data) && data.length === 0) {
-          console.log("🌱 Supabase menu_items is empty. Auto-seeding default menu...");
-          await DataService.seedDefaultMenuToSupabase();
-          cachedMenu = defaultMenu;
-          localStorage.setItem("mamis_basic_menu", JSON.stringify(defaultMenu));
-        }
-      } catch (e) {
-        console.warn("Supabase fetch exception, using cached/default:", e);
+    try {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Supabase Timeout")), 2500)
+      );
+
+      const fetchPromise = supabaseClient.from("menu_items").select("*").order("created_at", { ascending: false });
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        cachedMenu = data.map(item => ({
+          id: String(item.id),
+          name: item.name || "Untitled Item",
+          category: normalizeCategory(item.category),
+          price: Number(item.price) || 0,
+          available: item.available !== false && item.available !== "false",
+          badge: item.badge || "Popular",
+          description: item.description || item.desc || "",
+          image: item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80"
+        }));
+
+        localStorage.setItem("mamis_basic_menu", JSON.stringify(cachedMenu));
+
+        // Smooth background refresh of UI if cloud data changed
+        if (document.getElementById("customerMenu")) renderCustomerMenuUI();
+        if (document.getElementById("adminMenuList")) renderAdminMenuUI();
+      } else if (!error && Array.isArray(data) && data.length === 0) {
+        await DataService.seedDefaultMenuToSupabase();
       }
+    } catch (e) {
+      console.warn("Background cloud sync skipped (timeout/offline):", e);
     }
-
-    return cachedMenu;
   }
 
   static async seedDefaultMenuToSupabase() {
@@ -236,7 +241,7 @@ class DataService {
   }
 
   static async updateItemPriceAndStock(id, newPrice, isAvailable) {
-    const menu = await DataService.getMenuItems();
+    const menu = DataService.getMenuItemsSync();
     const target = menu.find(i => String(i.id) === String(id));
     if (target) {
       if (newPrice !== undefined && !isNaN(newPrice)) target.price = Number(newPrice);
@@ -246,13 +251,13 @@ class DataService {
   }
 
   static async addItem(newItem) {
-    const menu = await DataService.getMenuItems();
+    const menu = DataService.getMenuItemsSync();
     menu.push(newItem);
     await DataService.saveMenuItems(menu);
   }
 
   static async deleteItem(id) {
-    let menu = await DataService.getMenuItems();
+    let menu = DataService.getMenuItemsSync();
     menu = menu.filter(i => String(i.id) !== String(id));
     await DataService.saveMenuItems(menu);
 
@@ -264,15 +269,22 @@ class DataService {
   }
 }
 
-// 5. CUSTOMER SIDE MENU DISPLAY ENGINE (INSTANT IN-MEMORY FILTERING)
+// 5. CUSTOMER SIDE MENU DISPLAY ENGINE (INSTANT RENDERING)
 let activeCategory = "All";
 let activeSearchQuery = "";
 
-async function renderCustomerMenu() {
+function renderCustomerMenu() {
+  // 1. Render immediately from memory/localStorage (0ms)
+  renderCustomerMenuUI();
+  // 2. Non-blocking background sync with Supabase
+  DataService.syncFromSupabaseBackground();
+}
+
+function renderCustomerMenuUI() {
   const container = document.getElementById("customerMenu");
   if (!container) return;
 
-  const menu = await DataService.getMenuItems();
+  const menu = DataService.getMenuItemsSync();
 
   const counts = { All: menu.length, Main: 0, Drinks: 0, Dessert: 0 };
   menu.forEach(item => {
@@ -364,18 +376,18 @@ function filterCategory(cat) {
     btn.classList.toggle("active", isTarget);
   });
   
-  // Instant in-memory filtering (0ms)
-  renderCustomerMenu();
+  // Instant in-memory rendering (0ms)
+  renderCustomerMenuUI();
 }
 
 function handleSearch(query) {
   activeSearchQuery = query;
-  renderCustomerMenu();
+  renderCustomerMenuUI();
 }
 
 // 6. ITEM DETAIL MODAL
-async function openItemModal(id) {
-  const menu = await DataService.getMenuItems();
+function openItemModal(id) {
+  const menu = DataService.getMenuItemsSync();
   const item = menu.find(i => String(i.id) === String(id));
   if (!item) return;
 
@@ -411,19 +423,20 @@ function verifyAdminPasscode() {
   }
 }
 
-async function initAdminDashboard() {
+function initAdminDashboard() {
   if (sessionStorage.getItem("admin_auth") === "true") {
     document.getElementById("passcodeModal").classList.remove("active");
     document.getElementById("adminContent").style.display = "block";
   }
-  await renderAdminMenu();
+  renderAdminMenuUI();
+  DataService.syncFromSupabaseBackground();
 }
 
-async function renderAdminMenu(filterQuery = "") {
+function renderAdminMenuUI(filterQuery = "") {
   const container = document.getElementById("adminMenuList");
   if (!container) return;
 
-  const menu = await DataService.getMenuItems();
+  const menu = DataService.getMenuItemsSync();
   updateAdminStats(menu);
 
   const filtered = menu.filter(i => 
@@ -494,20 +507,20 @@ async function handleAdminPriceChange(id, val) {
   if (isNaN(price) || price < 0) return;
   await DataService.updateItemPriceAndStock(id, price, undefined);
   showToast("Price updated successfully!");
-  renderAdminMenu();
+  renderAdminMenuUI();
 }
 
 async function handleAdminStockToggle(id, isChecked) {
   await DataService.updateItemPriceAndStock(id, undefined, isChecked);
   showToast(isChecked ? "Item marked as In Stock" : "Item marked as Sold Out");
-  renderAdminMenu();
+  renderAdminMenuUI();
 }
 
 async function handleAdminItemDelete(id) {
   if (confirm("Are you sure you want to delete this dish from the menu?")) {
     await DataService.deleteItem(id);
     showToast("Dish removed from menu");
-    renderAdminMenu();
+    renderAdminMenuUI();
   }
 }
 
@@ -557,7 +570,7 @@ async function handleAddNewItem(e) {
 
   e.target.reset();
   uploadedImageBase64 = "";
-  renderAdminMenu();
+  renderAdminMenuUI();
 }
 
 async function resetMenuData() {
@@ -566,7 +579,7 @@ async function resetMenuData() {
     cachedMenu = defaultMenu;
     await DataService.saveMenuItems(defaultMenu);
     showToast("Menu reset to defaults");
-    renderAdminMenu();
+    renderAdminMenuUI();
   }
 }
 
