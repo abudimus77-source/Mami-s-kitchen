@@ -10,9 +10,13 @@ let supabaseClient = null;
 if (typeof supabase !== "undefined") {
   try {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } catch (err) {}
+    console.log("🟢 Connected to Supabase Cloud Backend");
+  } catch (err) {
+    console.warn("Supabase client init warning:", err);
+  }
 }
 
+// 2. DEFAULT INITIAL MENU DATA
 const defaultMenu = [
   {
     id: "item_1",
@@ -96,6 +100,7 @@ const defaultMenu = [
   }
 ];
 
+// 3. I18N BILINGUAL TRANSLATION DICTIONARY
 const i18n = {
   en: {
     brand_sub: "Digital Menu & Fresh Dining",
@@ -126,33 +131,82 @@ function setLanguage(lang) {
   if (document.getElementById("adminMenuList")) renderAdminMenu();
 }
 
+// Helper: Flexible Category Normalizer
+function normalizeCategory(catStr) {
+  if (!catStr) return "Main";
+  const c = String(catStr).toLowerCase().trim();
+  if (c.includes("main")) return "Main";
+  if (c.includes("drink") || c.includes("beverage") || c.includes("juice") || c.includes("coffee")) return "Drinks";
+  if (c.includes("dessert") || c.includes("snack") || c.includes("cake") || c.includes("sweet")) return "Dessert";
+  return "Main";
+}
+
+// 4. DATA SERVICE LAYER WITH AUTOMATIC SEEDING & FALLBACK
 class DataService {
   static async getMenuItems() {
     if (supabaseClient) {
       try {
-        const { data, error } = await supabaseClient.from("menu_items").select("*");
-        if (!error && data && data.length > 0) {
+        const { data, error } = await supabaseClient.from("menu_items").select("*").order("created_at", { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
           return data.map(item => ({
-            id: item.id,
-            name: item.name,
-            category: item.category || "Main",
-            price: Number(item.price),
+            id: String(item.id),
+            name: item.name || "Untitled Item",
+            category: normalizeCategory(item.category),
+            price: Number(item.price) || 0,
             available: item.available !== false && item.available !== "false",
             badge: item.badge || "Popular",
-            description: item.description || "",
+            description: item.description || item.desc || "",
             image: item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80"
           }));
         }
-      } catch (e) {}
+
+        if (!error && Array.isArray(data) && data.length === 0) {
+          console.log("🌱 Supabase menu_items is empty. Auto-seeding initial default menu...");
+          await DataService.seedDefaultMenuToSupabase();
+          return defaultMenu;
+        }
+
+        if (error) {
+          console.warn("Supabase fetch menu error, using fallback:", error);
+        }
+      } catch (e) {
+        console.warn("Supabase fetch exception, using fallback:", e);
+      }
     }
 
     const localData = localStorage.getItem("mamis_basic_menu");
     if (localData) {
-      try { return JSON.parse(localData); } catch (e) {}
+      try {
+        const parsed = JSON.parse(localData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map(i => ({ ...i, category: normalizeCategory(i.category) }));
+        }
+      } catch (e) {}
     }
 
     localStorage.setItem("mamis_basic_menu", JSON.stringify(defaultMenu));
     return defaultMenu;
+  }
+
+  static async seedDefaultMenuToSupabase() {
+    if (!supabaseClient) return;
+    try {
+      const itemsToInsert = defaultMenu.map(m => ({
+        id: m.id,
+        name: m.name,
+        category: m.category,
+        price: m.price,
+        badge: m.badge,
+        description: m.description,
+        image: m.image,
+        available: m.available
+      }));
+      const { error } = await supabaseClient.from("menu_items").insert(itemsToInsert);
+      if (error) console.warn("Auto-seed insertion error:", error);
+    } catch (e) {
+      console.warn("Auto-seed exception:", e);
+    }
   }
 
   static async saveMenuItems(menu) {
@@ -162,9 +216,9 @@ class DataService {
       try {
         for (const item of menu) {
           await supabaseClient.from("menu_items").upsert({
-            id: item.id,
+            id: String(item.id),
             name: item.name,
-            category: item.category,
+            category: normalizeCategory(item.category),
             price: Number(item.price),
             available: item.available,
             badge: item.badge,
@@ -172,7 +226,9 @@ class DataService {
             image: item.image
           });
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn("Supabase sync failed:", e);
+      }
     }
   }
 
@@ -205,6 +261,7 @@ class DataService {
   }
 }
 
+// 5. CUSTOMER SIDE MENU DISPLAY ENGINE
 let activeCategory = "All";
 let activeSearchQuery = "";
 
@@ -216,18 +273,27 @@ async function renderCustomerMenu() {
 
   const counts = { All: menu.length, Main: 0, Drinks: 0, Dessert: 0 };
   menu.forEach(item => {
-    const c = item.category || "Main";
-    if (counts[c] !== undefined) counts[c]++;
+    const norm = normalizeCategory(item.category);
+    if (counts[norm] !== undefined) {
+      counts[norm]++;
+    }
   });
 
-  for (const k in counts) {
-    const badgeEl = document.getElementById(`count${k}`);
-    if (badgeEl) badgeEl.textContent = counts[k];
-  }
+  const elAll = document.getElementById("countAll");
+  const elMain = document.getElementById("countMain");
+  const elDrinks = document.getElementById("countDrinks");
+  const elDessert = document.getElementById("countDessert");
+
+  if (elAll) elAll.textContent = counts.All;
+  if (elMain) elMain.textContent = counts.Main;
+  if (elDrinks) elDrinks.textContent = counts.Drinks;
+  if (elDessert) elDessert.textContent = counts.Dessert;
 
   const filtered = menu.filter(item => {
-    const matchesCategory = (activeCategory === "All") || 
-      (item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
+    const itemNormCat = normalizeCategory(item.category);
+    const activeNormCat = normalizeCategory(activeCategory);
+
+    const matchesCategory = (activeCategory === "All") || (itemNormCat === activeNormCat);
     const matchesSearch = !activeSearchQuery || 
       item.name.toLowerCase().includes(activeSearchQuery.toLowerCase()) || 
       (item.description && item.description.toLowerCase().includes(activeSearchQuery.toLowerCase()));
@@ -287,7 +353,12 @@ function getBadgeIcon(badge) {
 function filterCategory(cat) {
   activeCategory = cat;
   document.querySelectorAll(".cat-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.textContent.includes(cat) || (cat === "All" && btn.textContent.includes("All")));
+    const btnText = btn.textContent.toLowerCase();
+    const isTarget = (cat === "All" && btnText.includes("all")) ||
+      (cat === "Main" && (btnText.includes("main") || btnText.includes("ዋና"))) ||
+      (cat === "Drinks" && (btnText.includes("drink") || btnText.includes("መጠጥ"))) ||
+      (cat === "Dessert" && (btnText.includes("dessert") || btnText.includes("ጣፋጭ")));
+    btn.classList.toggle("active", isTarget);
   });
   renderCustomerMenu();
 }
@@ -297,6 +368,7 @@ function handleSearch(query) {
   renderCustomerMenu();
 }
 
+// 6. ITEM DETAIL MODAL
 async function openItemModal(id) {
   const menu = await DataService.getMenuItems();
   const item = menu.find(i => String(i.id) === String(id));
@@ -321,6 +393,7 @@ function closeModalOnBackdrop(e) {
   if (e.target.id === "itemModal") closeItemModal();
 }
 
+// 7. ADMIN DASHBOARD ENGINE
 function verifyAdminPasscode() {
   const val = document.getElementById("adminPasscode").value;
   if (val === "@abudi77") {
@@ -450,7 +523,7 @@ async function handleAddNewItem(e) {
   e.preventDefault();
 
   const name = document.getElementById("newItemName").value.trim();
-  const category = document.getElementById("newItemCategory").value;
+  const category = normalizeCategory(document.getElementById("newItemCategory").value);
   const price = Number(document.getElementById("newItemPrice").value);
   const badge = document.getElementById("newItemBadge").value;
   const desc = document.getElementById("newItemDesc").value.trim();
