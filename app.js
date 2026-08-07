@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ማሚስ ኪችን (Mami's Kitchen) - Supabase Auth & Pure Digital Menu Engine
+   ማሚስ ኪችን (Mami's Kitchen) - Empty Menu Slate Data Engine
    ========================================================================== */
 
 const SUPABASE_URL = "https://cqubbysmuvawqoccickl.supabase.co";
@@ -15,89 +15,8 @@ if (typeof supabase !== "undefined") {
   }
 }
 
-// 2. DEFAULT INITIAL MENU DATA
-const defaultMenu = [
-  {
-    id: "item_1",
-    name: "Special Kitfo (ስፔሻል ክትፎ)",
-    category: "Main",
-    price: 380,
-    available: true,
-    badge: "Popular",
-    description: "Finely minced lean beef seasoned with mitmita and niter kibbeh, served with ayib and gomen.",
-    image: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: "item_2",
-    name: "Doro Wat (ዶሮ ወጥ)",
-    category: "Main",
-    price: 320,
-    available: true,
-    badge: "Traditional",
-    description: "Slow-cooked spicy chicken stew with hard-boiled eggs and traditional berbere sauce.",
-    image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: "item_3",
-    name: "Beef Tibs (የበሬ ጥብስ)",
-    category: "Main",
-    price: 290,
-    available: true,
-    badge: "Popular",
-    description: "Sautéed beef strips with onions, rosemary, garlic, and green chilies.",
-    image: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: "item_4",
-    name: "Shiro Tagelinos (ሽሮ ተጋቢኖ)",
-    category: "Main",
-    price: 180,
-    available: true,
-    badge: "Popular",
-    description: "Rich chickpea flour stew simmered in a traditional clay pot with garlic and kibbeh.",
-    image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: "item_5",
-    name: "Yetsom Beyaynetu (የጾም በያይነቱ)",
-    category: "Main",
-    price: 210,
-    available: true,
-    badge: "Fresh",
-    description: "Assorted vegan combination platter including lentils, cabbage, beets, and yellow split peas.",
-    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: "item_6",
-    name: "Fresh Mango Juice (የማንጎ ጁስ)",
-    category: "Drinks",
-    price: 90,
-    available: true,
-    badge: "Fresh",
-    description: "100% natural pureed fresh mango juice.",
-    image: "https://images.unsplash.com/photo-1546173159-315724a31696?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: "item_7",
-    name: "Ethiopian Macchiato (ማኪያቶ)",
-    category: "Drinks",
-    price: 45,
-    available: true,
-    badge: "Popular",
-    description: "Layered espresso with steamed fresh milk.",
-    image: "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?auto=format&fit=crop&w=600&q=80"
-  },
-  {
-    id: "item_8",
-    name: "Traditional Coffee (የጀበና ቡና)",
-    category: "Drinks",
-    price: 35,
-    available: true,
-    badge: "Traditional",
-    description: "Freshly roasted clay pot Jebena coffee served with frankincense aroma.",
-    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80"
-  }
-];
+// Default initial menu is now EMPTY
+const defaultMenu = [];
 
 // 3. I18N BILINGUAL TRANSLATION DICTIONARY
 const i18n = {
@@ -130,6 +49,7 @@ function setLanguage(lang) {
   if (document.getElementById("adminMenuList")) renderAdminMenuUI();
 }
 
+// Helper: Normalize category strings
 function normalizeCategory(catStr) {
   if (!catStr) return "Main";
   const c = String(catStr).toLowerCase().trim();
@@ -139,28 +59,29 @@ function normalizeCategory(catStr) {
   return "Main";
 }
 
+// 4. DATA SERVICE LAYER
 let cachedMenu = null;
 
 class DataService {
   static getMenuItemsSync() {
-    if (cachedMenu && cachedMenu.length > 0) {
+    if (cachedMenu !== null) {
       return cachedMenu;
     }
 
     const localData = localStorage.getItem("mamis_basic_menu");
-    if (localData) {
+    if (localData !== null) {
       try {
         const parsed = JSON.parse(localData);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           cachedMenu = parsed.map(i => ({ ...i, category: normalizeCategory(i.category) }));
           return cachedMenu;
         }
       } catch (e) {}
     }
 
-    cachedMenu = defaultMenu;
-    localStorage.setItem("mamis_basic_menu", JSON.stringify(defaultMenu));
-    return defaultMenu;
+    cachedMenu = [];
+    localStorage.setItem("mamis_basic_menu", JSON.stringify([]));
+    return cachedMenu;
   }
 
   static async syncFromSupabaseBackground() {
@@ -175,7 +96,7 @@ class DataService {
 
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         cachedMenu = data.map(item => ({
           id: String(item.id),
           name: item.name || "Untitled Item",
@@ -191,29 +112,10 @@ class DataService {
 
         if (document.getElementById("customerMenu")) renderCustomerMenuUI();
         if (document.getElementById("adminMenuList")) renderAdminMenuUI();
-      } else if (!error && Array.isArray(data) && data.length === 0) {
-        await DataService.seedDefaultMenuToSupabase();
       }
     } catch (e) {
-      console.warn("Background cloud sync skipped (timeout/offline):", e);
+      console.warn("Background cloud sync skipped:", e);
     }
-  }
-
-  static async seedDefaultMenuToSupabase() {
-    if (!supabaseClient) return;
-    try {
-      const itemsToInsert = defaultMenu.map(m => ({
-        id: m.id,
-        name: m.name,
-        category: m.category,
-        price: m.price,
-        badge: m.badge,
-        description: m.description,
-        image: m.image,
-        available: m.available
-      }));
-      await supabaseClient.from("menu_items").insert(itemsToInsert);
-    } catch (e) {}
   }
 
   static async saveMenuItems(menu) {
@@ -257,11 +159,23 @@ class DataService {
   static async deleteItem(id) {
     let menu = DataService.getMenuItemsSync();
     menu = menu.filter(i => String(i.id) !== String(id));
-    await DataService.saveMenuItems(menu);
+    cachedMenu = menu;
+    localStorage.setItem("mamis_basic_menu", JSON.stringify(menu));
 
     if (supabaseClient) {
       try {
         await supabaseClient.from("menu_items").delete().eq("id", id);
+      } catch (e) {}
+    }
+  }
+
+  static async clearAllItems() {
+    cachedMenu = [];
+    localStorage.setItem("mamis_basic_menu", JSON.stringify([]));
+
+    if (supabaseClient) {
+      try {
+        await supabaseClient.from("menu_items").delete().neq("id", "0");
       } catch (e) {}
     }
   }
@@ -316,8 +230,8 @@ function renderCustomerMenuUI() {
     container.innerHTML = `
       <div class="empty-state" style="grid-column: 1 / -1;">
         <i class="fa-solid fa-utensils empty-state-icon"></i>
-        <h3>No dishes found</h3>
-        <p>Try searching for a different item or category.</p>
+        <h3>No dishes on the menu</h3>
+        <p>The menu is currently empty. Items added from the control panel will appear here.</p>
       </div>
     `;
     return;
@@ -379,6 +293,7 @@ function handleSearch(query) {
   renderCustomerMenuUI();
 }
 
+// 6. ITEM DETAIL MODAL
 function openItemModal(id) {
   const menu = DataService.getMenuItemsSync();
   const item = menu.find(i => String(i.id) === String(id));
@@ -403,7 +318,7 @@ function closeModalOnBackdrop(e) {
   if (e.target.id === "itemModal") closeItemModal();
 }
 
-// 6. SUPABASE EMAIL & PASSWORD AUTHENTICATION SYSTEM
+// 7. SUPABASE EMAIL & PASSWORD AUTHENTICATION SYSTEM
 let isSignUpMode = false;
 
 function toggleAuthMode(e) {
@@ -507,7 +422,7 @@ async function logoutFromSupabase() {
   showToast("Logged out successfully");
 }
 
-// 7. ADMIN DASHBOARD ENGINE
+// 8. ADMIN DASHBOARD ENGINE
 function renderAdminMenuUI(filterQuery = "") {
   const container = document.getElementById("adminMenuList");
   if (!container) return;
@@ -526,7 +441,7 @@ function renderAdminMenuUI(filterQuery = "") {
       <div class="empty-state">
         <i class="fa-solid fa-list-check empty-state-icon"></i>
         <h3>No menu items</h3>
-        <p>Use the form above to add new dishes to the digital menu.</p>
+        <p>Use the form above to add new dishes to your digital menu.</p>
       </div>
     `;
     return;
@@ -600,6 +515,15 @@ async function handleAdminItemDelete(id) {
   }
 }
 
+async function clearAllMenuData() {
+  if (confirm("Are you sure you want to delete ALL items from the menu? This will give you a completely clean menu slate.")) {
+    await DataService.clearAllItems();
+    showToast("All items deleted. Menu is now empty!");
+    if (document.getElementById("customerMenu")) renderCustomerMenuUI();
+    if (document.getElementById("adminMenuList")) renderAdminMenuUI();
+  }
+}
+
 let uploadedImageBase64 = "";
 function handleAdminFileUpload(input) {
   if (input.files && input.files[0]) {
@@ -647,16 +571,6 @@ async function handleAddNewItem(e) {
   e.target.reset();
   uploadedImageBase64 = "";
   renderAdminMenuUI();
-}
-
-async function resetMenuData() {
-  if (confirm("Reset menu back to default sample items? Custom changes will be overwritten.")) {
-    localStorage.removeItem("mamis_basic_menu");
-    cachedMenu = defaultMenu;
-    await DataService.saveMenuItems(defaultMenu);
-    showToast("Menu reset to defaults");
-    renderAdminMenuUI();
-  }
 }
 
 function showToast(message) {
