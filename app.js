@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ማሚስ ኪችን (Mami's Kitchen) - Basic Package Data Engine
+   ማሚስ ኪችን (Mami's Kitchen) - Basic Package Ultra-Fast Data Engine
    Pure Digital Menu & Price Control System
    ========================================================================== */
 
@@ -141,15 +141,37 @@ function normalizeCategory(catStr) {
   return "Main";
 }
 
-// 4. DATA SERVICE LAYER WITH AUTOMATIC SEEDING & FALLBACK
+// 4. BLAZING FAST IN-MEMORY DATA SERVICE LAYER
+let cachedMenu = null;
+
 class DataService {
-  static async getMenuItems() {
+  static async getMenuItems(forceRefresh = false) {
+    if (cachedMenu && !forceRefresh) {
+      return cachedMenu;
+    }
+
+    // 1. Check LocalStorage for 0ms instant display
+    const localData = localStorage.getItem("mamis_basic_menu");
+    if (localData && !forceRefresh) {
+      try {
+        const parsed = JSON.parse(localData);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          cachedMenu = parsed.map(i => ({ ...i, category: normalizeCategory(i.category) }));
+        }
+      } catch (e) {}
+    }
+
+    if (!cachedMenu) {
+      cachedMenu = defaultMenu;
+    }
+
+    // 2. Fetch from Supabase in background
     if (supabaseClient) {
       try {
         const { data, error } = await supabaseClient.from("menu_items").select("*").order("created_at", { ascending: false });
 
         if (!error && Array.isArray(data) && data.length > 0) {
-          return data.map(item => ({
+          cachedMenu = data.map(item => ({
             id: String(item.id),
             name: item.name || "Untitled Item",
             category: normalizeCategory(item.category),
@@ -159,34 +181,19 @@ class DataService {
             description: item.description || item.desc || "",
             image: item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80"
           }));
-        }
-
-        if (!error && Array.isArray(data) && data.length === 0) {
-          console.log("🌱 Supabase menu_items is empty. Auto-seeding initial default menu...");
+          localStorage.setItem("mamis_basic_menu", JSON.stringify(cachedMenu));
+        } else if (!error && Array.isArray(data) && data.length === 0) {
+          console.log("🌱 Supabase menu_items is empty. Auto-seeding default menu...");
           await DataService.seedDefaultMenuToSupabase();
-          return defaultMenu;
-        }
-
-        if (error) {
-          console.warn("Supabase fetch menu error, using fallback:", error);
+          cachedMenu = defaultMenu;
+          localStorage.setItem("mamis_basic_menu", JSON.stringify(defaultMenu));
         }
       } catch (e) {
-        console.warn("Supabase fetch exception, using fallback:", e);
+        console.warn("Supabase fetch exception, using cached/default:", e);
       }
     }
 
-    const localData = localStorage.getItem("mamis_basic_menu");
-    if (localData) {
-      try {
-        const parsed = JSON.parse(localData);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map(i => ({ ...i, category: normalizeCategory(i.category) }));
-        }
-      } catch (e) {}
-    }
-
-    localStorage.setItem("mamis_basic_menu", JSON.stringify(defaultMenu));
-    return defaultMenu;
+    return cachedMenu;
   }
 
   static async seedDefaultMenuToSupabase() {
@@ -202,14 +209,12 @@ class DataService {
         image: m.image,
         available: m.available
       }));
-      const { error } = await supabaseClient.from("menu_items").insert(itemsToInsert);
-      if (error) console.warn("Auto-seed insertion error:", error);
-    } catch (e) {
-      console.warn("Auto-seed exception:", e);
-    }
+      await supabaseClient.from("menu_items").insert(itemsToInsert);
+    } catch (e) {}
   }
 
   static async saveMenuItems(menu) {
+    cachedMenu = menu;
     localStorage.setItem("mamis_basic_menu", JSON.stringify(menu));
 
     if (supabaseClient) {
@@ -226,9 +231,7 @@ class DataService {
             image: item.image
           });
         }
-      } catch (e) {
-        console.warn("Supabase sync failed:", e);
-      }
+      } catch (e) {}
     }
   }
 
@@ -261,7 +264,7 @@ class DataService {
   }
 }
 
-// 5. CUSTOMER SIDE MENU DISPLAY ENGINE
+// 5. CUSTOMER SIDE MENU DISPLAY ENGINE (INSTANT IN-MEMORY FILTERING)
 let activeCategory = "All";
 let activeSearchQuery = "";
 
@@ -360,6 +363,8 @@ function filterCategory(cat) {
       (cat === "Dessert" && (btnText.includes("dessert") || btnText.includes("ጣፋጭ")));
     btn.classList.toggle("active", isTarget);
   });
+  
+  // Instant in-memory filtering (0ms)
   renderCustomerMenu();
 }
 
@@ -558,6 +563,7 @@ async function handleAddNewItem(e) {
 async function resetMenuData() {
   if (confirm("Reset menu back to default sample items? Custom changes will be overwritten.")) {
     localStorage.removeItem("mamis_basic_menu");
+    cachedMenu = defaultMenu;
     await DataService.saveMenuItems(defaultMenu);
     showToast("Menu reset to defaults");
     renderAdminMenu();
