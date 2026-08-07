@@ -1,91 +1,111 @@
-/**
- * Tasty Bites / ማሚስ ኪችን - Upgraded Digital Menu & Realtime Order System
- */
+/* ==========================================================================
+   ማሚስ ኪችን (Mami's Kitchen) - Basic Package Data Engine
+   Pure Digital Menu & Price Control System
+   ========================================================================== */
 
-// --- CONFIGURATION ---
 const SUPABASE_URL = "https://cqubbysmuvawqoccickl.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_ZsrXwTLNjQu2wC9fKioVPA_36gJGsmK";
-const ADMIN_PASSCODE = "@abudi77"; // Admin owner passcode
+const SUPABASE_KEY = "sb_publishable_ZsrXwTLNjQu2wC9fKioVPA_36gJGsmK";
 
-// --- TRANSLATION DICTIONARY (English & Amharic) ---
+let supabaseClient = null;
+if (typeof supabase !== "undefined") {
+  try {
+    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } catch (err) {}
+}
+
+const defaultMenu = [
+  {
+    id: "item_1",
+    name: "Special Kitfo (ስፔሻል ክትፎ)",
+    category: "Main",
+    price: 380,
+    available: true,
+    badge: "Popular",
+    description: "Finely minced lean beef seasoned with mitmita and niter kibbeh, served with ayib and gomen.",
+    image: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "item_2",
+    name: "Doro Wat (ዶሮ ወጥ)",
+    category: "Main",
+    price: 320,
+    available: true,
+    badge: "Traditional",
+    description: "Slow-cooked spicy chicken stew with hard-boiled eggs and traditional berbere sauce.",
+    image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "item_3",
+    name: "Beef Tibs (የበሬ ጥብስ)",
+    category: "Main",
+    price: 290,
+    available: true,
+    badge: "Popular",
+    description: "Sautéed beef strips with onions, rosemary, garlic, and green chilies.",
+    image: "https://images.unsplash.com/photo-1603048588665-791ca8aea617?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "item_4",
+    name: "Shiro Tagelinos (ሽሮ ተጋቢኖ)",
+    category: "Main",
+    price: 180,
+    available: true,
+    badge: "Popular",
+    description: "Rich chickpea flour stew simmered in a traditional clay pot with garlic and kibbeh.",
+    image: "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "item_5",
+    name: "Yetsom Beyaynetu (የጾም በያይነቱ)",
+    category: "Main",
+    price: 210,
+    available: true,
+    badge: "Fresh",
+    description: "Assorted vegan combination platter including lentils, cabbage, beets, and yellow split peas.",
+    image: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "item_6",
+    name: "Fresh Mango Juice (የማንጎ ጁስ)",
+    category: "Drinks",
+    price: 90,
+    available: true,
+    badge: "Fresh",
+    description: "100% natural pureed fresh mango juice.",
+    image: "https://images.unsplash.com/photo-1546173159-315724a31696?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "item_7",
+    name: "Ethiopian Macchiato (ማኪያቶ)",
+    category: "Drinks",
+    price: 45,
+    available: true,
+    badge: "Popular",
+    description: "Layered espresso with steamed fresh milk.",
+    image: "https://images.unsplash.com/photo-1517701550927-30cf4ba1dba5?auto=format&fit=crop&w=600&q=80"
+  },
+  {
+    id: "item_8",
+    name: "Traditional Coffee (የጀበና ቡና)",
+    category: "Drinks",
+    price: 35,
+    available: true,
+    badge: "Traditional",
+    description: "Freshly roasted clay pot Jebena coffee served with frankincense aroma.",
+    image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?auto=format&fit=crop&w=600&q=80"
+  }
+];
+
 const i18n = {
   en: {
-    brandName: "ማሚስ ኪችን",
-    brandSubtitle: "Digital Menu & Fresh Dining",
-    searchPlaceholder: "Search dishes, drinks, desserts...",
-    catAll: "All",
-    catMain: "Mains",
-    catDrinks: "Drinks",
-    catDessert: "Desserts",
-    yourOrder: "Your Order",
-    readyToOrder: "Ready to order",
-    emptyCartMsg: "Tap “Add to order” on any dish to build your meal.",
-    subtotal: "Subtotal",
-    dineIn: "Dine In",
-    takeaway: "Takeaway",
-    nameLabel: "Name",
-    namePlaceholder: "Your name",
-    tableLabel: "Table Number",
-    tablePlaceholder: "e.g. 12",
-    notesLabel: "Notes",
-    notesPlaceholder: "Allergies or special requests",
-    placeOrderBtn: "Place Order",
-    viewOrderBar: "View Order",
-    itemsText: "items",
-    itemText: "item",
-    addBtn: "+ Add",
-    detailsBtn: "Details",
-    closeBtn: "Close",
-    preparing: "Preparing",
-    ready: "Ready",
-    completed: "Complete",
-    deleteBtn: "Delete",
-    clearCompletedBtn: "Clear Completed Orders",
-    liveOrdersTab: "Incoming Live Orders",
-    addDishTab: "Add New Dish",
-    menuListTab: "Current Menu Items",
-    analyticsTab: "Sales & Analytics",
-    callWaiter: "Call Waiter",
-    requestBill: "Request Bill"
+    brand_sub: "Digital Menu & Fresh Dining",
+    search_placeholder: "Search dishes, drinks, desserts...",
+    sold_out: "Sold Out"
   },
   am: {
-    brandName: "ማሚስ ኪችን",
-    brandSubtitle: "ዲጂታል ሜኑ እና ጣፋጭ ምግብ",
-    searchPlaceholder: "ምግቦችን፣ መጠጦችን፣ ጣፋጮችን ይፈልጉ...",
-    catAll: "ሁሉም",
-    catMain: "ዋና ምግቦች",
-    catDrinks: "መጠጦች",
-    catDessert: "ጣፋጮች",
-    yourOrder: "ትዕዛዝዎ",
-    readyToOrder: "ለማዘዝ ዝግጁ",
-    emptyCartMsg: "ምግብ ለመምረጥ “ጨምር” የሚለውን ይጫኑ።",
-    subtotal: "ጠቅላላ ዋጋ",
-    dineIn: "እዚሁ ለመመገብ",
-    takeaway: "ይዞ ለመሄድ",
-    nameLabel: "ስም",
-    namePlaceholder: "ስምዎን ያስገቡ",
-    tableLabel: "የጠረጴዛ ቁጥር",
-    tablePlaceholder: "ምሳሌ፡ 12",
-    notesLabel: "ማስታወሻ",
-    notesPlaceholder: "ተጨማሪ ፍላጎት ወይም አለርጂ ካለዎት ያስገቡ",
-    placeOrderBtn: "ትዕዛዝ ይላኩ",
-    viewOrderBar: "ትዕዛዝ ይመልከቱ",
-    itemsText: "ምግቦች",
-    itemText: "ምግብ",
-    addBtn: "+ ጨምር",
-    detailsBtn: "ዝርዝር",
-    closeBtn: "ዝጋ",
-    preparing: "እየተዘጋጀ ነው",
-    ready: "ተዘጋጅቷል",
-    completed: "ተጠናቋል",
-    deleteBtn: "ሰርዝ",
-    clearCompletedBtn: "የተጠናቀቁትን አጽዳ",
-    liveOrdersTab: "የቀጥታ ትዕዛዞች",
-    addDishTab: "አዲስ ምግብ ጨምር",
-    menuListTab: "የሜኑ ዝርዝር",
-    analyticsTab: "የሽያጭ ትንታኔ",
-    callWaiter: "አስተናጋጅ ጥራ",
-    requestBill: "ሂሳብ ጠይቅ"
+    brand_sub: "ዘመናዊ የዲጂታል ሜኑ አገልግሎት",
+    search_placeholder: "ምግብ፣ መጠጥ ወይም ጣፋጭ ይፈልጉ...",
+    sold_out: "ያለቀ"
   }
 };
 
@@ -99,158 +119,395 @@ function setLanguage(lang) {
     btn.classList.toggle("active", btn.dataset.lang === lang);
   });
 
-  applyTranslations();
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) searchInput.placeholder = i18n[lang].search_placeholder;
+
   if (document.getElementById("customerMenu")) renderCustomerMenu();
   if (document.getElementById("adminMenuList")) renderAdminMenu();
-  showToast(lang === "am" ? "ቋንቋ ወደ አማርኛ ተቀይሯል" : "Language set to English");
 }
 
-function t(key) {
-  return (i18n[currentLang] && i18n[currentLang][key]) || i18n["en"][key] || key;
-}
+class DataService {
+  static async getMenuItems() {
+    if (supabaseClient) {
+      try {
+        const { data, error } = await supabaseClient.from("menu_items").select("*");
+        if (!error && data && data.length > 0) {
+          return data.map(item => ({
+            id: item.id,
+            name: item.name,
+            category: item.category || "Main",
+            price: Number(item.price),
+            available: item.available !== false && item.available !== "false",
+            badge: item.badge || "Popular",
+            description: item.description || "",
+            image: item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80"
+          }));
+        }
+      } catch (e) {}
+    }
 
-function applyTranslations() {
-  const searchInput = document.getElementById("searchInput");
-  if (searchInput) searchInput.placeholder = t("searchPlaceholder");
+    const localData = localStorage.getItem("mamis_basic_menu");
+    if (localData) {
+      try { return JSON.parse(localData); } catch (e) {}
+    }
 
-  const namePlaceholder = document.getElementById("customerName");
-  if (namePlaceholder) namePlaceholder.placeholder = t("namePlaceholder");
+    localStorage.setItem("mamis_basic_menu", JSON.stringify(defaultMenu));
+    return defaultMenu;
+  }
 
-  const notesPlaceholder = document.getElementById("orderNotes");
-  if (notesPlaceholder) notesPlaceholder.placeholder = t("notesPlaceholder");
+  static async saveMenuItems(menu) {
+    localStorage.setItem("mamis_basic_menu", JSON.stringify(menu));
 
-  const placeOrderBtn = document.querySelector(".order-btn");
-  if (placeOrderBtn) placeOrderBtn.innerText = t("placeOrderBtn");
+    if (supabaseClient) {
+      try {
+        for (const item of menu) {
+          await supabaseClient.from("menu_items").upsert({
+            id: item.id,
+            name: item.name,
+            category: item.category,
+            price: Number(item.price),
+            available: item.available,
+            badge: item.badge,
+            description: item.description,
+            image: item.image
+          });
+        }
+      } catch (e) {}
+    }
+  }
 
-  const clearCompletedBtn = document.getElementById("clearCompletedBtnText");
-  if (clearCompletedBtn) clearCompletedBtn.innerText = t("clearCompletedBtn");
+  static async updateItemPriceAndStock(id, newPrice, isAvailable) {
+    const menu = await DataService.getMenuItems();
+    const target = menu.find(i => String(i.id) === String(id));
+    if (target) {
+      if (newPrice !== undefined && !isNaN(newPrice)) target.price = Number(newPrice);
+      if (isAvailable !== undefined) target.available = Boolean(isAvailable);
+      await DataService.saveMenuItems(menu);
+    }
+  }
 
-  const tabLiveOrders = document.getElementById("tabBtn_liveOrders");
-  if (tabLiveOrders) tabLiveOrders.innerHTML = `<i class="fa-solid fa-bell"></i> ${t("liveOrdersTab")}`;
+  static async addItem(newItem) {
+    const menu = await DataService.getMenuItems();
+    menu.push(newItem);
+    await DataService.saveMenuItems(menu);
+  }
 
-  const tabAddDish = document.getElementById("tabBtn_addDish");
-  if (tabAddDish) tabAddDish.innerHTML = `<i class="fa-solid fa-plus"></i> ${t("addDishTab")}`;
+  static async deleteItem(id) {
+    let menu = await DataService.getMenuItems();
+    menu = menu.filter(i => String(i.id) !== String(id));
+    await DataService.saveMenuItems(menu);
 
-  const tabMenuList = document.getElementById("tabBtn_menuList");
-  if (tabMenuList) tabMenuList.innerHTML = `<i class="fa-solid fa-list-check"></i> ${t("menuListTab")}`;
-
-  const tabAnalytics = document.getElementById("tabBtn_analytics");
-  if (tabAnalytics) tabAnalytics.innerHTML = `<i class="fa-solid fa-chart-line"></i> ${t("analyticsTab")}`;
-}
-
-// Initialize Supabase Client
-let supabaseClient = null;
-if (typeof supabase !== "undefined" && SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL.startsWith("http")) {
-  try {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log("🟢 Connected to Supabase Cloud Backend");
-  } catch (err) {
-    console.warn("⚠️ Failed to initialize Supabase, falling back to LocalStorage:", err);
+    if (supabaseClient) {
+      try {
+        await supabaseClient.from("menu_items").delete().eq("id", id);
+      } catch (e) {}
+    }
   }
 }
 
-// BroadcastChannel for instant multi-tab sync when running in LocalStorage mode
-const syncChannel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("digital_menu_sync") : null;
-if (syncChannel) {
-  syncChannel.onmessage = (event) => {
-    if (event.data === "menu_updated") {
-      if (document.getElementById("customerMenu")) renderCustomerMenu();
-      if (document.getElementById("adminMenuList")) renderAdminMenu();
-    } else if (event.data === "orders_updated") {
-      if (document.getElementById("adminOrdersList")) renderAdminOrders();
-      if (document.getElementById("activeOrderTracker")) renderCustomerOrderTracker();
-      if (document.getElementById("analyticsContainer")) renderAdminAnalytics();
-    } else if (event.data === "waiter_updated") {
-      if (document.getElementById("adminWaiterRequestsList")) renderAdminWaiterRequests();
-    }
+let activeCategory = "All";
+let activeSearchQuery = "";
+
+async function renderCustomerMenu() {
+  const container = document.getElementById("customerMenu");
+  if (!container) return;
+
+  const menu = await DataService.getMenuItems();
+
+  const counts = { All: menu.length, Main: 0, Drinks: 0, Dessert: 0 };
+  menu.forEach(item => {
+    const c = item.category || "Main";
+    if (counts[c] !== undefined) counts[c]++;
+  });
+
+  for (const k in counts) {
+    const badgeEl = document.getElementById(`count${k}`);
+    if (badgeEl) badgeEl.textContent = counts[k];
+  }
+
+  const filtered = menu.filter(item => {
+    const matchesCategory = (activeCategory === "All") || 
+      (item.category && item.category.toLowerCase() === activeCategory.toLowerCase());
+    const matchesSearch = !activeSearchQuery || 
+      item.name.toLowerCase().includes(activeSearchQuery.toLowerCase()) || 
+      (item.description && item.description.toLowerCase().includes(activeSearchQuery.toLowerCase()));
+    
+    return matchesCategory && matchesSearch;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="grid-column: 1 / -1;">
+        <i class="fa-solid fa-utensils empty-state-icon"></i>
+        <h3>No dishes found</h3>
+        <p>Try searching for a different item or category.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(item => `
+    <article class="glass-card card ${!item.available ? 'sold-out-card' : ''}" onclick="openItemModal('${item.id}')">
+      <div class="card-image-wrap">
+        <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}" loading="lazy">
+        <span class="badge-tag">
+          <i class="fa-solid fa-${getBadgeIcon(item.badge)}"></i> ${escapeHtml(item.badge || 'Popular')}
+        </span>
+      </div>
+      
+      <div class="card-body">
+        <div>
+          <h3 class="card-title">${escapeHtml(item.name)}</h3>
+          <p class="card-desc">${escapeHtml(item.description || 'Delicious freshly prepared dish.')}</p>
+        </div>
+        
+        <div class="card-footer">
+          <span class="card-price">Br ${Number(item.price).toFixed(0)}</span>
+          <div class="card-actions">
+            ${item.available !== false 
+              ? `<button class="btn-detail" onclick="event.stopPropagation(); openItemModal('${item.id}')"><i class="fa-solid fa-eye"></i> View</button>`
+              : `<span class="badge-tag" style="background:rgba(239,68,68,0.2); color:var(--danger); border-color:rgba(239,68,68,0.4); font-size:0.75rem;">${i18n[currentLang].sold_out}</span>`
+            }
+          </div>
+        </div>
+      </div>
+    </article>
+  `).join("");
+}
+
+function getBadgeIcon(badge) {
+  if (!badge) return "star";
+  const b = badge.toLowerCase();
+  if (b.includes("trad")) return "fire";
+  if (b.includes("chef")) return "user-ninja";
+  if (b.includes("fresh")) return "leaf";
+  return "star";
+}
+
+function filterCategory(cat) {
+  activeCategory = cat;
+  document.querySelectorAll(".cat-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.textContent.includes(cat) || (cat === "All" && btn.textContent.includes("All")));
+  });
+  renderCustomerMenu();
+}
+
+function handleSearch(query) {
+  activeSearchQuery = query;
+  renderCustomerMenu();
+}
+
+async function openItemModal(id) {
+  const menu = await DataService.getMenuItems();
+  const item = menu.find(i => String(i.id) === String(id));
+  if (!item) return;
+
+  document.getElementById("modalImg").src = item.image;
+  document.getElementById("modalTitle").textContent = item.name;
+  document.getElementById("modalDesc").textContent = item.description || "Freshly prepared with authentic Ethiopian spices.";
+  document.getElementById("modalPrice").textContent = `Br ${Number(item.price).toFixed(0)}`;
+  
+  const badgeEl = document.getElementById("modalBadge");
+  badgeEl.innerHTML = `<i class="fa-solid fa-${getBadgeIcon(item.badge)}"></i> ${escapeHtml(item.badge || 'Popular')}`;
+
+  document.getElementById("itemModal").classList.add("active");
+}
+
+function closeItemModal() {
+  document.getElementById("itemModal").classList.remove("active");
+}
+
+function closeModalOnBackdrop(e) {
+  if (e.target.id === "itemModal") closeItemModal();
+}
+
+function verifyAdminPasscode() {
+  const val = document.getElementById("adminPasscode").value;
+  if (val === "@abudi77") {
+    document.getElementById("passcodeModal").classList.remove("active");
+    document.getElementById("adminContent").style.display = "block";
+    sessionStorage.setItem("admin_auth", "true");
+    initAdminDashboard();
+  } else {
+    document.getElementById("passcodeError").style.display = "block";
+  }
+}
+
+async function initAdminDashboard() {
+  if (sessionStorage.getItem("admin_auth") === "true") {
+    document.getElementById("passcodeModal").classList.remove("active");
+    document.getElementById("adminContent").style.display = "block";
+  }
+  await renderAdminMenu();
+}
+
+async function renderAdminMenu(filterQuery = "") {
+  const container = document.getElementById("adminMenuList");
+  if (!container) return;
+
+  const menu = await DataService.getMenuItems();
+  updateAdminStats(menu);
+
+  const filtered = menu.filter(i => 
+    !filterQuery || 
+    i.name.toLowerCase().includes(filterQuery.toLowerCase()) || 
+    (i.category && i.category.toLowerCase().includes(filterQuery.toLowerCase()))
+  );
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-list-check empty-state-icon"></i>
+        <h3>No menu items</h3>
+        <p>Use the form above to add new dishes to the digital menu.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = filtered.map(item => `
+    <div class="admin-item-row">
+      <div class="admin-item-info">
+        <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.name)}">
+        <div class="admin-item-details">
+          <h4>${escapeHtml(item.name)}</h4>
+          <span>${escapeHtml(item.category)} • ${escapeHtml(item.badge || 'Popular')}</span>
+        </div>
+      </div>
+
+      <div class="admin-controls">
+        <div class="price-input-wrap">
+          <span>Br</span>
+          <input type="number" class="price-input" value="${Number(item.price)}" min="0" step="1" onchange="handleAdminPriceChange('${item.id}', this.value)">
+        </div>
+
+        <label class="switch" title="Toggle Stock Availability">
+          <input type="checkbox" ${item.available !== false ? 'checked' : ''} onchange="handleAdminStockToggle('${item.id}', this.checked)">
+          <span class="slider"></span>
+        </label>
+
+        <button type="button" class="btn-delete small" onclick="handleAdminItemDelete('${item.id}')" title="Delete Item">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function updateAdminStats(menu) {
+  const total = menu.length;
+  const inStock = menu.filter(i => i.available !== false).length;
+  const soldOut = total - inStock;
+  const avgPrice = total > 0 ? (menu.reduce((acc, i) => acc + Number(i.price), 0) / total) : 0;
+
+  const elTotal = document.getElementById("statTotalItems");
+  const elStock = document.getElementById("statInStock");
+  const elSold = document.getElementById("statSoldOut");
+  const elAvg = document.getElementById("statAvgPrice");
+
+  if (elTotal) elTotal.textContent = total;
+  if (elStock) elStock.textContent = inStock;
+  if (elSold) elSold.textContent = soldOut;
+  if (elAvg) elAvg.textContent = `Br ${avgPrice.toFixed(0)}`;
+}
+
+async function handleAdminPriceChange(id, val) {
+  const price = Number(val);
+  if (isNaN(price) || price < 0) return;
+  await DataService.updateItemPriceAndStock(id, price, undefined);
+  showToast("Price updated successfully!");
+  renderAdminMenu();
+}
+
+async function handleAdminStockToggle(id, isChecked) {
+  await DataService.updateItemPriceAndStock(id, undefined, isChecked);
+  showToast(isChecked ? "Item marked as In Stock" : "Item marked as Sold Out");
+  renderAdminMenu();
+}
+
+async function handleAdminItemDelete(id) {
+  if (confirm("Are you sure you want to delete this dish from the menu?")) {
+    await DataService.deleteItem(id);
+    showToast("Dish removed from menu");
+    renderAdminMenu();
+  }
+}
+
+let uploadedImageBase64 = "";
+function handleAdminFileUpload(input) {
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      uploadedImageBase64 = e.target.result;
+      document.getElementById("newItemImage").value = "Photo Uploaded!";
+      showToast("Photo uploaded successfully!");
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+async function handleAddNewItem(e) {
+  e.preventDefault();
+
+  const name = document.getElementById("newItemName").value.trim();
+  const category = document.getElementById("newItemCategory").value;
+  const price = Number(document.getElementById("newItemPrice").value);
+  const badge = document.getElementById("newItemBadge").value;
+  const desc = document.getElementById("newItemDesc").value.trim();
+  let imgInput = document.getElementById("newItemImage").value.trim();
+
+  let finalImg = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80";
+  if (uploadedImageBase64) {
+    finalImg = uploadedImageBase64;
+  } else if (imgInput && imgInput.startsWith("http")) {
+    finalImg = imgInput;
+  }
+
+  const newItem = {
+    id: "item_" + Date.now(),
+    name,
+    category,
+    price,
+    available: true,
+    badge,
+    description: desc,
+    image: finalImg
   };
+
+  await DataService.addItem(newItem);
+  showToast("New dish added to menu!");
+
+  e.target.reset();
+  uploadedImageBase64 = "";
+  renderAdminMenu();
 }
 
-// --- ADMIN AUTHENTICATION ---
-function verifyAdminPin() {
-  const pinInput = document.getElementById("adminPinInput");
-  const enteredPin = pinInput ? pinInput.value.trim() : "";
-
-  if (enteredPin === ADMIN_PASSCODE) {
-    sessionStorage.setItem("admin_authenticated", "true");
-    const authModal = document.getElementById("authModal");
-    if (authModal) authModal.classList.remove("active");
-    showToast("Owner Dashboard unlocked!");
-  } else {
-    showToast("Incorrect passcode. Try again.", "error");
-    if (pinInput) pinInput.value = "";
+async function resetMenuData() {
+  if (confirm("Reset menu back to default sample items? Custom changes will be overwritten.")) {
+    localStorage.removeItem("mamis_basic_menu");
+    await DataService.saveMenuItems(defaultMenu);
+    showToast("Menu reset to defaults");
+    renderAdminMenu();
   }
 }
 
-function checkAdminAuth() {
-  const authModal = document.getElementById("authModal");
-  if (!authModal) return;
+function showToast(message) {
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
 
-  if (sessionStorage.getItem("admin_authenticated") === "true") {
-    authModal.classList.remove("active");
-  } else {
-    authModal.classList.add("active");
-  }
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerHTML = `<i class="fa-solid fa-circle-check" style="color:var(--success);"></i> <span>${escapeHtml(message)}</span>`;
+  container.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
 }
 
-// --- ADMIN TAB NAVIGATION ---
-function switchAdminTab(tabName) {
-  document.querySelectorAll(".admin-tab-btn").forEach(btn => btn.classList.remove("active"));
-  document.querySelectorAll(".admin-tab-content").forEach(content => content.style.display = "none");
-
-  const activeBtn = document.getElementById(`tabBtn_${tabName}`);
-  const activeContent = document.getElementById(`tabContent_${tabName}`);
-
-  if (activeBtn) activeBtn.classList.add("active");
-  if (activeContent) activeContent.style.display = "block";
-
-  if (tabName === "analytics") {
-    renderAdminAnalytics();
-  }
-}
-
-// --- MOBILE CART DRAWER TOGGLE ---
-function toggleMobileCart(show) {
-  const orderCard = document.getElementById("orderCard");
-  const orderOverlay = document.getElementById("orderOverlay");
-
-  if (orderCard && orderOverlay) {
-    if (show) {
-      orderCard.classList.add("open");
-      orderOverlay.classList.add("active");
-    } else {
-      orderCard.classList.remove("open");
-      orderOverlay.classList.remove("active");
-    }
-  }
-}
-
-// --- URL TABLE NUMBER AUTO-DETECTION ---
-function detectTableFromUrl() {
-  const urlParams = new URLSearchParams(window.location.search);
-  const tableParam = urlParams.get("table") || urlParams.get("t");
-
-  if (tableParam) {
-    sessionStorage.setItem("detected_table_number", tableParam);
-  }
-
-  const savedTable = sessionStorage.getItem("detected_table_number");
-  if (savedTable) {
-    const tableInput = document.getElementById("tableNumber");
-    if (tableInput && !tableInput.value) {
-      tableInput.value = savedTable;
-    }
-    const tableBadge = document.getElementById("headerTableBadge");
-    if (tableBadge) {
-      tableBadge.innerHTML = `<i class="fa-solid fa-chair"></i> ${t("tableLabel")} ${escapeHtml(savedTable)}`;
-      tableBadge.style.display = "inline-flex";
-    }
-  }
-}
-
-// --- UTILITIES & SECURITY ---
 function escapeHtml(str) {
-  if (str === null || str === undefined) return "";
+  if (!str) return "";
   return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -258,1235 +515,3 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
-
-function showToast(message, type = "info") {
-  const container = document.getElementById("toastContainer");
-  if (!container) return;
-
-  const toast = document.createElement("div");
-  toast.className = "toast";
-  const icon = type === "error" ? "fa-circle-exclamation" : "fa-circle-check";
-  const iconColor = type === "error" ? "var(--danger)" : "var(--primary)";
-
-  toast.innerHTML = `<i class="fa-solid ${icon}" style="color: ${iconColor};"></i> ${escapeHtml(message)}`;
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.style.opacity = "0";
-    toast.style.transform = "translateX(100%)";
-    toast.style.transition = "all 0.3s ease";
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
-}
-
-// Default initial menu data fallback
-const defaultMenu = [
-  { id: "1", name: "Classic Cheeseburger", category: "Main", price: 320, image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&q=80", badge: "⭐ Popular", desc: "100% Angus beef patty topped with melted cheddar, crisp lettuce, vine tomatoes, and signature house sauce on a toasted brioche bun.", available: true },
-  { id: "2", name: "Artisan Pepperoni Pizza", category: "Main", price: 420, image: "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=600&q=80", badge: "👨‍🍳 Chef's Special", desc: "Hand-tossed sourdough crust topped with San Marzano tomato sauce, fresh mozzarella, and crispy cupping pepperoni slices.", available: true },
-  { id: "3", name: "Truffle Ribeye Steak", category: "Main", price: 680, image: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80", badge: "✨ Signature", desc: "12oz Prime ribeye grilled to perfection, drizzled with black truffle butter and served with garlic roasted baby potatoes.", available: true },
-  { id: "4", name: "Fresh Peach Iced Tea", category: "Drinks", price: 130, image: "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=600&q=80", badge: "🌱 Fresh Organic", desc: "Freshly brewed Black tea infused with organic white peach nectar, mint leaves, and ice.", available: true },
-  { id: "5", name: "Tropical Mango Smoothie", category: "Drinks", price: 150, image: "https://images.unsplash.com/photo-1546173159-315724a31696?w=600&q=80", badge: "🥭 Refreshing", desc: "Blend of Alphonso mangoes, Greek yogurt, coconut water, and a touch of wild honey.", available: true },
-  { id: "6", name: "Chocolate Lava Cake", category: "Dessert", price: 220, image: "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?w=600&q=80", badge: "🍫 Decadent", desc: "Warm dark chocolate cake with a molten chocolate center, served with Madagascan vanilla bean ice cream.", available: true },
-  { id: "7", name: "Matcha Cheesecake", category: "Dessert", price: 200, image: "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?w=600&q=80", badge: "✨ New", desc: "Creamy Uji matcha infused Japanese cheesecake with a toasted graham cracker crust.", available: false },
-  { id: "8", name: "ስፔሻል ክትፎ", category: "Main", price: 750, image: "https://images.unsplash.com/photo-1544025162-d76694265947?w=600&q=80", badge: "🔥 Traditional", desc: "በቅቤና በሚጥሚጣ የተዘጋጀ ትኩስ አገር በቀል ስፔሻል ክትፎ።", available: true },
-  { id: "9", name: "ዶሮ ወጥ", category: "Main", price: 360, image: "https://images.unsplash.com/photo-1547592180-85f173990554?w=600&q=80", badge: "🔥 Spicy", desc: "በበርበሬና በቅቤ በጥንቃቄ የተሰራ ባህላዊ የዶሮ ወጥ ከእንጀራ ጋር።", available: true },
-  { id: "10", name: "የኢትዮጵያ ቡና", category: "Drinks", price: 120, image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=600&q=80", badge: "☕ Traditional", desc: "በትኩሱ የተፈጨ ባህላዊ የኢትዮጵያ ቡና።", available: true }
-];
-
-const CART_STORAGE_KEY = "digital_menu_cart";
-const MENU_STORAGE_KEY = "digital_menu_data";
-const ORDERS_STORAGE_KEY = "digital_menu_orders";
-const WAITER_STORAGE_KEY = "digital_waiter_requests";
-const ACTIVE_ORDER_ID_KEY = "customer_active_order_id";
-
-let selectedCategory = "All";
-let searchQuery = "";
-let adminSearchQuery = "";
-let selectedServiceMode = "dine-in";
-let currentMenuItems = [];
-let currentOrders = [];
-let currentWaiterRequests = [];
-
-// --- UNIFIED DATA SERVICE ---
-const DataService = {
-  async fetchMenuItems() {
-    if (supabaseClient) {
-      try {
-        const { data, error } = await supabaseClient
-          .from("menu_items")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && Array.isArray(data) && data.length > 0) {
-          currentMenuItems = data.map(item => ({
-            id: String(item.id),
-            name: item.name || 'Untitled Item',
-            category: item.category || 'Main',
-            price: parseFloat(item.price) || 0,
-            image: item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80',
-            badge: item.badge || '',
-            desc: item.description || item.desc || '',
-            available: item.available !== false && item.available !== "false"
-          }));
-          return currentMenuItems;
-        }
-
-        if (!error && Array.isArray(data) && data.length === 0) {
-          console.log("🌱 Supabase menu table is empty. Auto-seeding initial menu...");
-          await this.seedDefaultMenuToSupabase();
-          currentMenuItems = defaultMenu;
-          return currentMenuItems;
-        }
-
-        if (error) {
-          console.warn("Supabase fetch menu error, falling back to default menu:", error);
-        }
-      } catch (err) {
-        console.warn("Supabase error during fetch:", err);
-      }
-    }
-
-    const saved = localStorage.getItem(MENU_STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          currentMenuItems = parsed;
-          return currentMenuItems;
-        }
-      } catch (e) {}
-    }
-
-    localStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(defaultMenu));
-    currentMenuItems = defaultMenu;
-    return currentMenuItems;
-  },
-
-  async seedDefaultMenuToSupabase() {
-    if (!supabaseClient) return;
-    const itemsToInsert = defaultMenu.map(m => ({
-      name: m.name,
-      category: m.category,
-      price: m.price,
-      badge: m.badge,
-      description: m.desc,
-      image: m.image,
-      available: m.available
-    }));
-
-    const { error } = await supabaseClient.from("menu_items").insert(itemsToInsert);
-    if (error) console.warn("Auto-seed error:", error);
-  },
-
-  async saveMenuItems(items) {
-    currentMenuItems = items;
-    localStorage.setItem(MENU_STORAGE_KEY, JSON.stringify(items));
-    if (syncChannel) syncChannel.postMessage("menu_updated");
-  },
-
-  async fetchOrders() {
-    if (supabaseClient) {
-      try {
-        const { data, error } = await supabaseClient
-          .from("orders")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (!error && data) {
-          currentOrders = data.map(o => ({
-            id: String(o.id),
-            customerName: o.customer_name,
-            serviceMode: o.service_mode,
-            tableNumber: o.table_number,
-            notes: o.notes,
-            items: o.items,
-            subtotal: parseFloat(o.subtotal),
-            status: o.status,
-            createdAt: o.created_at
-          }));
-          return currentOrders;
-        }
-      } catch(err) {
-        console.warn("Fetch orders error:", err);
-      }
-    }
-
-    const saved = localStorage.getItem(ORDERS_STORAGE_KEY);
-    try { currentOrders = saved ? JSON.parse(saved) : []; } catch (e) { currentOrders = []; }
-    return currentOrders;
-  },
-
-  async createOrder(orderData) {
-    let createdRecord = orderData;
-    if (supabaseClient) {
-      const { data, error } = await supabaseClient
-        .from("orders")
-        .insert([{
-          customer_name: orderData.customerName,
-          service_mode: orderData.serviceMode,
-          table_number: orderData.tableNumber,
-          notes: orderData.notes,
-          items: orderData.items,
-          subtotal: orderData.subtotal,
-          status: "Pending"
-        }])
-        .select();
-
-      if (!error && data && data.length > 0) {
-        createdRecord = { ...orderData, id: String(data[0].id) };
-      } else {
-        console.error("Supabase order insert error:", error);
-      }
-    }
-
-    const orders = await this.fetchOrders();
-    orders.unshift(createdRecord);
-    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
-    localStorage.setItem(ACTIVE_ORDER_ID_KEY, createdRecord.id);
-
-    if (syncChannel) syncChannel.postMessage("orders_updated");
-    return createdRecord;
-  },
-
-  async updateOrderStatus(orderId, newStatus) {
-    if (supabaseClient) {
-      const { error } = await supabaseClient
-        .from("orders")
-        .update({ status: newStatus })
-        .eq("id", orderId);
-      if (error) console.error("Supabase update status error:", error);
-    }
-
-    const orders = await this.fetchOrders();
-    const order = orders.find(o => String(o.id) === String(orderId));
-    if (order) {
-      order.status = newStatus;
-      localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
-      if (syncChannel) syncChannel.postMessage("orders_updated");
-    }
-  },
-
-  async deleteOrder(orderId) {
-    if (supabaseClient) {
-      const { error } = await supabaseClient
-        .from("orders")
-        .delete()
-        .eq("id", orderId);
-      if (error) console.error("Supabase delete order error:", error);
-    }
-
-    const orders = await this.fetchOrders();
-    const updated = orders.filter(o => String(o.id) !== String(orderId));
-    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(updated));
-    if (syncChannel) syncChannel.postMessage("orders_updated");
-  },
-
-  async clearCompletedOrders() {
-    if (supabaseClient) {
-      const { error } = await supabaseClient
-        .from("orders")
-        .delete()
-        .in("status", ["Completed", "Cancelled"]);
-      if (error) console.error("Supabase clear completed error:", error);
-    }
-
-    const orders = await this.fetchOrders();
-    const updated = orders.filter(o => o.status !== "Completed" && o.status !== "Cancelled");
-    localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(updated));
-    if (syncChannel) syncChannel.postMessage("orders_updated");
-  },
-
-  // --- WAITER CALL & BILL REQUESTS ---
-  async createWaiterRequest(tableNumber, type) {
-    const reqData = {
-      id: Date.now().toString(),
-      tableNumber,
-      requestType: type,
-      status: 'Pending',
-      createdAt: new Date().toISOString()
-    };
-
-    if (supabaseClient) {
-      const { error } = await supabaseClient.from("waiter_requests").insert([{
-        table_number: tableNumber,
-        request_type: type,
-        status: "Pending"
-      }]);
-      if (error) console.warn("Waiter request insert error:", error);
-    }
-
-    const saved = localStorage.getItem(WAITER_STORAGE_KEY);
-    const requests = saved ? JSON.parse(saved) : [];
-    requests.unshift(reqData);
-    localStorage.setItem(WAITER_STORAGE_KEY, JSON.stringify(requests));
-
-    if (syncChannel) syncChannel.postMessage("waiter_updated");
-    return reqData;
-  },
-
-  async fetchWaiterRequests() {
-    if (supabaseClient) {
-      try {
-        const { data, error } = await supabaseClient
-          .from("waiter_requests")
-          .select("*")
-          .eq("status", "Pending")
-          .order("created_at", { ascending: false });
-
-        if (!error && data) {
-          currentWaiterRequests = data.map(r => ({
-            id: String(r.id),
-            tableNumber: r.table_number,
-            requestType: r.request_type,
-            status: r.status,
-            createdAt: r.created_at
-          }));
-          return currentWaiterRequests;
-        }
-      } catch(e){}
-    }
-
-    const saved = localStorage.getItem(WAITER_STORAGE_KEY);
-    try {
-      currentWaiterRequests = saved ? JSON.parse(saved).filter(r => r.status === 'Pending') : [];
-    } catch (e) {
-      currentWaiterRequests = [];
-    }
-    return currentWaiterRequests;
-  },
-
-  async resolveWaiterRequest(reqId) {
-    if (supabaseClient) {
-      await supabaseClient.from("waiter_requests").update({ status: "Resolved" }).eq("id", reqId);
-    }
-    const saved = localStorage.getItem(WAITER_STORAGE_KEY);
-    if (saved) {
-      const requests = JSON.parse(saved);
-      const req = requests.find(r => String(r.id) === String(reqId));
-      if (req) req.status = 'Resolved';
-      localStorage.setItem(WAITER_STORAGE_KEY, JSON.stringify(requests));
-    }
-    if (syncChannel) syncChannel.postMessage("waiter_updated");
-  },
-
-  async toggleAvailability(itemId) {
-    const items = await this.fetchMenuItems();
-    const item = items.find(i => String(i.id) === String(itemId));
-    if (!item) return;
-
-    const newAvailable = !item.available;
-    item.available = newAvailable;
-
-    if (supabaseClient) {
-      await supabaseClient.from("menu_items").update({ available: newAvailable }).eq("id", itemId);
-    }
-    await this.saveMenuItems(items);
-  },
-
-  async updatePrice(itemId, newPrice) {
-    const items = await this.fetchMenuItems();
-    const item = items.find(i => String(i.id) === String(itemId));
-    if (!item) return;
-
-    const parsedPrice = parseFloat(newPrice) || 0;
-    item.price = parsedPrice;
-
-    if (supabaseClient) {
-      await supabaseClient.from("menu_items").update({ price: parsedPrice }).eq("id", itemId);
-    }
-    await this.saveMenuItems(items);
-  },
-
-  async deleteItem(itemId) {
-    if (supabaseClient) {
-      await supabaseClient.from("menu_items").delete().eq("id", itemId);
-    }
-    const items = await this.fetchMenuItems();
-    const updated = items.filter(i => String(i.id) !== String(itemId));
-    await this.saveMenuItems(updated);
-  },
-
-  async addItem(itemData) {
-    if (supabaseClient) {
-      const { data, error } = await supabaseClient
-        .from("menu_items")
-        .insert([{
-          name: itemData.name,
-          category: itemData.category,
-          price: itemData.price,
-          badge: itemData.badge,
-          description: itemData.desc,
-          image: itemData.image,
-          available: true
-        }])
-        .select();
-
-      if (!error && data && data.length > 0) {
-        await this.fetchMenuItems();
-        return;
-      }
-    }
-
-    const items = await this.fetchMenuItems();
-    items.unshift(itemData);
-    await this.saveMenuItems(items);
-  },
-
-  subscribeToRealtime() {
-    if (!supabaseClient) return;
-
-    supabaseClient
-      .channel("public:orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, async (payload) => {
-        if (payload.eventType === "INSERT") {
-          if (document.getElementById("adminOrdersList")) {
-            showToast(`🔔 New Order from Table ${payload.new.table_number || 'N/A'} (${payload.new.customer_name || 'Guest'})!`);
-            try {
-              const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-              audio.play().catch(() => {});
-            } catch(e){}
-          }
-        }
-        await DataService.fetchOrders();
-        if (document.getElementById("adminOrdersList")) renderAdminOrders();
-        if (document.getElementById("activeOrderTracker")) renderCustomerOrderTracker();
-        if (document.getElementById("analyticsContainer")) renderAdminAnalytics();
-      })
-      .subscribe();
-
-    supabaseClient
-      .channel("public:waiter_requests")
-      .on("postgres_changes", { event: "*", schema: "public", table: "waiter_requests" }, async (payload) => {
-        if (payload.eventType === "INSERT") {
-          if (document.getElementById("adminOrdersList")) {
-            const reqLabel = payload.new.request_type === 'request_bill' ? '🧾 Requesting Bill' : '🔔 Calling Waiter';
-            showToast(`⚠️ Table ${payload.new.table_number || 'N/A'} is ${reqLabel}!`, "error");
-            try {
-              const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
-              audio.play().catch(() => {});
-            } catch(e){}
-          }
-        }
-        await DataService.fetchWaiterRequests();
-        if (document.getElementById("adminWaiterRequestsList")) renderAdminWaiterRequests();
-      })
-      .subscribe();
-
-    supabaseClient
-      .channel("public:menu_items")
-      .on("postgres_changes", { event: "*", schema: "public", table: "menu_items" }, async () => {
-        await DataService.fetchMenuItems();
-        if (document.getElementById("customerMenu")) renderCustomerMenu();
-        if (document.getElementById("adminMenuList")) renderAdminMenu();
-      })
-      .subscribe();
-  }
-};
-
-// --- DIGITAL WAITER CALLING & BILL REQUEST HANDLERS ---
-async function handleCustomerWaiterAction(type) {
-  const tableInput = document.getElementById("tableNumber");
-  let tableNumber = tableInput ? tableInput.value.trim() : "";
-
-  if (!tableNumber) {
-    tableNumber = sessionStorage.getItem("detected_table_number");
-  }
-
-  if (!tableNumber) {
-    tableNumber = prompt("Please enter your Table Number:");
-    if (!tableNumber) return;
-    sessionStorage.setItem("detected_table_number", tableNumber);
-    if (tableInput) tableInput.value = tableNumber;
-  }
-
-  await DataService.createWaiterRequest(tableNumber, type);
-
-  const actionText = type === 'request_bill' ? 'Receipt/Bill Requested' : 'Waiter Called';
-  showToast(`🔔 Table ${escapeHtml(tableNumber)}: ${actionText}! Staff has been notified.`);
-}
-
-async function renderAdminWaiterRequests() {
-  const container = document.getElementById("adminWaiterRequestsList");
-  if (!container) return;
-
-  const requests = await DataService.fetchWaiterRequests();
-
-  if (requests.length === 0) {
-    container.style.display = "none";
-    return;
-  }
-
-  container.style.display = "block";
-  container.innerHTML = `
-    <div class="glass-card waiter-alerts-card" style="margin-bottom: 20px; border-color: rgba(245,158,11,0.5);">
-      <div class="section-header" style="margin-bottom: 10px;">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <span class="eyebrow" style="color:var(--primary);"><i class="fa-solid fa-bell-concierge"></i> Table Alerts (${requests.length})</span>
-        </div>
-      </div>
-      <div style="display:flex; flex-wrap:wrap; gap:10px;">
-        ${requests.map(req => {
-          const isBill = req.requestType === 'request_bill';
-          const badgeText = isBill ? '🧾 Requesting Bill' : '🔔 Called Waiter';
-          return `
-            <div class="waiter-alert-chip">
-              <strong>📍 Table ${escapeHtml(req.tableNumber)}</strong>
-              <span>${badgeText}</span>
-              <button type="button" class="btn-primary small" style="padding:4px 10px; font-size:0.75rem;" onclick="handleResolveWaiterRequest('${escapeHtml(req.id)}')">
-                <i class="fa-solid fa-check"></i> Resolve
-              </button>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
-}
-
-async function handleResolveWaiterRequest(reqId) {
-  await DataService.resolveWaiterRequest(reqId);
-  await renderAdminWaiterRequests();
-  showToast("Waiter alert resolved!");
-}
-
-// --- SALES & REVENUE ANALYTICS ENGINE ---
-async function renderAdminAnalytics() {
-  const container = document.getElementById("analyticsContainer");
-  if (!container) return;
-
-  const orders = await DataService.fetchOrders();
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  const todayOrders = orders.filter(o => {
-    const orderDate = new Date(o.createdAt || Date.now()).toISOString().split('T')[0];
-    return orderDate === todayStr && o.status !== 'Cancelled';
-  });
-
-  const totalRevenueToday = todayOrders.reduce((sum, o) => sum + (parseFloat(o.subtotal) || 0), 0);
-  const totalOrdersCountToday = todayOrders.length;
-  const avgOrderValueToday = totalOrdersCountToday > 0 ? (totalRevenueToday / totalOrdersCountToday) : 0;
-
-  const dishCounts = {};
-  todayOrders.forEach(order => {
-    if (Array.isArray(order.items)) {
-      order.items.forEach(item => {
-        const name = item.name || 'Unknown Item';
-        const qty = parseInt(item.quantity) || 1;
-        dishCounts[name] = (dishCounts[name] || 0) + qty;
-      });
-    }
-  });
-
-  let topDishName = "None Yet";
-  let topDishCount = 0;
-  for (const [name, count] of Object.entries(dishCounts)) {
-    if (count > topDishCount) {
-      topDishName = name;
-      topDishCount = count;
-    }
-  }
-
-  const hourBuckets = { "Lunch (12PM - 3PM)": 0, "Afternoon (3PM - 6PM)": 0, "Dinner (6PM - 10PM)": 0, "Late/Other": 0 };
-  todayOrders.forEach(order => {
-    const hour = new Date(order.createdAt || Date.now()).getHours();
-    if (hour >= 12 && hour < 15) hourBuckets["Lunch (12PM - 3PM)"]++;
-    else if (hour >= 15 && hour < 18) hourBuckets["Afternoon (3PM - 6PM)"]++;
-    else if (hour >= 18 && hour < 22) hourBuckets["Dinner (6PM - 10PM)"]++;
-    else hourBuckets["Late/Other"]++;
-  });
-
-  container.innerHTML = `
-    <div class="stats-grid" style="margin-bottom: 24px;">
-      <article class="glass-card stat-card" style="border-color: rgba(16,185,129,0.4);">
-        <div class="stat-icon active"><i class="fa-solid fa-money-bill-wave"></i></div>
-        <div>
-          <div class="stat-value" style="color:var(--success);">Br ${totalRevenueToday.toFixed(0)}</div>
-          <div class="stat-label">Daily Revenue Today</div>
-        </div>
-      </article>
-
-      <article class="glass-card stat-card">
-        <div class="stat-icon total"><i class="fa-solid fa-bag-shopping"></i></div>
-        <div>
-          <div class="stat-value">${totalOrdersCountToday}</div>
-          <div class="stat-label">Orders Placed Today</div>
-        </div>
-      </article>
-
-      <article class="glass-card stat-card" style="border-color: rgba(245,158,11,0.4);">
-        <div class="stat-icon avg"><i class="fa-solid fa-crown"></i></div>
-        <div>
-          <div class="stat-value" style="font-size:1.1rem; color:var(--primary); line-clamp:1; -webkit-line-clamp:1;">${escapeHtml(topDishName)}</div>
-          <div class="stat-label">Top Dish (${topDishCount} sold)</div>
-        </div>
-      </article>
-
-      <article class="glass-card stat-card">
-        <div class="stat-icon avg"><i class="fa-solid fa-calculator"></i></div>
-        <div>
-          <div class="stat-value">Br ${avgOrderValueToday.toFixed(0)}</div>
-          <div class="stat-label">Avg Order Value</div>
-        </div>
-      </article>
-    </div>
-
-    <div class="glass-card add-item-card" style="margin-bottom: 24px;">
-      <div class="section-header">
-        <div>
-          <p class="eyebrow"><i class="fa-solid fa-clock"></i> Ordering Time Analytics</p>
-          <h3 class="section-title">Peak Ordering Hours Today</h3>
-        </div>
-      </div>
-      <div style="display:flex; flex-direction:column; gap:14px; margin-top:10px;">
-        ${Object.entries(hourBuckets).map(([period, count]) => {
-          const pct = totalOrdersCountToday > 0 ? Math.round((count / totalOrdersCountToday) * 100) : 0;
-          return `
-            <div>
-              <div style="display:flex; justify-content:space-between; margin-bottom:4px; font-size:0.88rem; color:var(--text-main);">
-                <span>${period}</span>
-                <strong>${count} orders (${pct}%)</strong>
-              </div>
-              <div class="tracker-progress-wrap" style="height:10px;">
-                <div class="tracker-progress-bar" style="width: ${pct}%;"></div>
-              </div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
-}
-
-// --- CART MANAGEMENT ---
-function getCart() {
-  try {
-    const saved = localStorage.getItem(CART_STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
-  } catch (e) { return []; }
-}
-
-function saveCart(cart) {
-  localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-}
-
-function getCartItemsWithDetails() {
-  const cart = getCart();
-  return cart
-    .map(entry => {
-      const item = currentMenuItems.find(menuItem => String(menuItem.id) === String(entry.id));
-      return item ? { ...item, quantity: entry.quantity || 1 } : null;
-    })
-    .filter(Boolean);
-}
-
-function addToCart(id) {
-  const item = currentMenuItems.find(menuItem => String(menuItem.id) === String(id));
-  if (!item) return;
-
-  const cart = getCart();
-  const existing = cart.find(entry => String(entry.id) === String(id));
-
-  if (existing) { existing.quantity += 1; } 
-  else { cart.push({ id, quantity: 1 }); }
-
-  saveCart(cart);
-  renderCart();
-  renderCustomerMenu();
-  showToast(`${item.name} added to your order`);
-}
-
-function updateCartQuantity(id, delta) {
-  const cart = getCart();
-  const entry = cart.find(item => String(item.id) === String(id));
-  if (!entry) return;
-
-  entry.quantity += delta;
-  if (entry.quantity <= 0) {
-    saveCart(cart.filter(item => String(item.id) !== String(id)));
-  } else {
-    saveCart(cart);
-  }
-
-  renderCart();
-  renderCustomerMenu();
-}
-
-function removeFromCart(id) {
-  saveCart(getCart().filter(item => String(item.id) !== String(id)));
-  renderCart();
-  renderCustomerMenu();
-}
-
-function getCartSubtotal(items) {
-  return items.reduce((total, item) => total + (parseFloat(item.price) || 0) * item.quantity, 0);
-}
-
-function setServiceMode(mode) {
-  selectedServiceMode = mode;
-  document.querySelectorAll('.service-chip').forEach(chip => {
-    chip.classList.toggle('active', chip.dataset.mode === mode);
-  });
-
-  const tableRow = document.getElementById('tableRow');
-  if (tableRow) tableRow.style.display = mode === 'dine-in' ? 'flex' : 'none';
-}
-
-function renderCart() {
-  const cartItems = getCartItemsWithDetails();
-  const countPill = document.getElementById("cartCountPill");
-  const totalEl = document.getElementById("cartTotal");
-  const container = document.getElementById("cartItemsList");
-  const placeOrderBtn = document.querySelector(".order-btn");
-
-  const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const subtotalFormatted = `Br ${getCartSubtotal(cartItems).toFixed(0)}`;
-
-  if (countPill) {
-    const itemLabel = totalItems === 1 ? t("itemText") : t("itemsText");
-    countPill.innerText = `${totalItems} ${itemLabel}`;
-  }
-
-  if (totalEl) totalEl.innerText = subtotalFormatted;
-
-  const mobileBar = document.getElementById("mobileCartBar");
-  const mobileBadge = document.getElementById("mobileCartBadge");
-  const mobileTotal = document.getElementById("mobileCartTotal");
-
-  if (mobileBar && mobileBadge && mobileTotal) {
-    mobileBadge.innerText = totalItems;
-    mobileTotal.innerText = subtotalFormatted;
-    if (totalItems > 0) {
-      mobileBar.classList.add("active");
-    } else {
-      mobileBar.classList.remove("active");
-    }
-  }
-
-  if (!container) return;
-
-  if (cartItems.length === 0) {
-    container.innerHTML = `<div class="empty-cart">${t("emptyCartMsg")}</div>`;
-    if (placeOrderBtn) placeOrderBtn.disabled = true;
-    return;
-  }
-
-  if (placeOrderBtn) placeOrderBtn.disabled = false;
-
-  container.innerHTML = cartItems.map(item => `
-    <div class="cart-item">
-      <div>
-        <div class="cart-item-name">${escapeHtml(item.name)}</div>
-        <div class="cart-item-meta">Br ${parseFloat(item.price).toFixed(0)}</div>
-      </div>
-      <div class="cart-item-controls">
-        <button class="cart-qty-btn" onclick="updateCartQuantity('${escapeHtml(item.id)}', -1)">−</button>
-        <span>${item.quantity}</span>
-        <button class="cart-qty-btn" onclick="updateCartQuantity('${escapeHtml(item.id)}', 1)">+</button>
-      </div>
-      <button class="cart-remove-btn" onclick="removeFromCart('${escapeHtml(item.id)}')" title="Remove item">
-        <i class="fa-solid fa-xmark"></i>
-      </button>
-    </div>
-  `).join("");
-}
-
-// --- ORDER PLACEMENT ---
-async function placeOrder() {
-  const cartItems = getCartItemsWithDetails();
-  if (cartItems.length === 0) {
-    showToast("Add something to your order first.", "error");
-    return;
-  }
-
-  const customerName = document.getElementById("customerName")?.value?.trim() || "Guest";
-  const notes = document.getElementById("orderNotes")?.value?.trim() || "";
-  const tableNumber = document.getElementById("tableNumber")?.value?.trim() || sessionStorage.getItem("detected_table_number") || "";
-  const subtotal = getCartSubtotal(cartItems);
-  const serviceLabel = selectedServiceMode === 'takeaway' ? t("takeaway") : t("dineIn");
-  const locationText = selectedServiceMode === 'dine-in' && tableNumber ? ` • ${t("tableLabel")} ${escapeHtml(tableNumber)}` : '';
-
-  const newOrder = {
-    id: Date.now().toString(),
-    customerName,
-    serviceMode: selectedServiceMode,
-    tableNumber,
-    notes,
-    items: cartItems.map(item => ({ id: item.id, name: item.name, quantity: item.quantity, price: item.price })),
-    subtotal,
-    status: 'Pending',
-    createdAt: new Date().toISOString()
-  };
-
-  const created = await DataService.createOrder(newOrder);
-
-  saveCart([]);
-  renderCart();
-  renderCustomerMenu();
-  toggleMobileCart(false);
-  renderCustomerOrderTracker();
-
-  if (document.getElementById("customerName")) document.getElementById("customerName").value = "";
-  if (document.getElementById("orderNotes")) document.getElementById("orderNotes").value = "";
-
-  showToast(`Order placed for ${escapeHtml(customerName)} via ${serviceLabel}! Total Br ${subtotal.toFixed(0)}${locationText}`);
-}
-
-// --- REAL-TIME CUSTOMER ORDER PROGRESS TRACKER ---
-async function renderCustomerOrderTracker() {
-  const trackerContainer = document.getElementById("activeOrderTracker");
-  if (!trackerContainer) return;
-
-  const activeOrderId = localStorage.getItem(ACTIVE_ORDER_ID_KEY);
-  if (!activeOrderId) {
-    trackerContainer.style.display = "none";
-    return;
-  }
-
-  const orders = await DataService.fetchOrders();
-  const activeOrder = orders.find(o => String(o.id) === String(activeOrderId));
-
-  if (!activeOrder || activeOrder.status === 'Completed' || activeOrder.status === 'Cancelled') {
-    trackerContainer.style.display = "none";
-    return;
-  }
-
-  trackerContainer.style.display = "block";
-
-  const status = activeOrder.status || 'Pending';
-  let progressPercent = 25;
-  let statusText = "Order Received by Kitchen";
-  let statusIcon = "fa-receipt";
-  let statusBadgeClass = "pending";
-
-  if (status === 'Preparing') {
-    progressPercent = 65;
-    statusText = "Chef is Preparing Your Meal";
-    statusIcon = "fa-fire-burner";
-    statusBadgeClass = "preparing";
-  } else if (status === 'Ready') {
-    progressPercent = 100;
-    statusText = "Order Ready to Serve!";
-    statusIcon = "fa-bell-concierge";
-    statusBadgeClass = "ready";
-  }
-
-  trackerContainer.innerHTML = `
-    <div class="glass-card tracker-card">
-      <div class="tracker-header">
-        <div>
-          <span class="eyebrow"><i class="fa-solid ${statusIcon}"></i> Live Order Progress</span>
-          <h4>📍 ${t("tableLabel")} ${escapeHtml(activeOrder.tableNumber || 'N/A')} (${escapeHtml(activeOrder.customerName || 'Guest')})</h4>
-        </div>
-        <span class="order-status ${statusBadgeClass}">${escapeHtml(status)}</span>
-      </div>
-      
-      <div class="tracker-progress-wrap">
-        <div class="tracker-progress-bar" style="width: ${progressPercent}%;"></div>
-      </div>
-
-      <div class="tracker-footer">
-        <span>${escapeHtml(statusText)}</span>
-        <strong>Br ${parseFloat(activeOrder.subtotal).toFixed(0)}</strong>
-      </div>
-    </div>
-  `;
-}
-
-// --- ADMIN ORDER DELETION & CLEANING HANDLERS ---
-async function handleDeleteOrder(orderId) {
-  if (confirm("Delete this order record from database?")) {
-    await DataService.deleteOrder(orderId);
-    await renderAdminOrders();
-    showToast("Order deleted!");
-  }
-}
-
-async function handleClearCompletedOrders() {
-  if (confirm("Clear all completed and cancelled orders from queue?")) {
-    await DataService.clearCompletedOrders();
-    await renderAdminOrders();
-    showToast("Completed orders cleared!");
-  }
-}
-
-// --- SEARCH & FILTER ---
-function filterCategory(cat) {
-  selectedCategory = cat;
-  document.querySelectorAll("#categoryNav .cat-btn").forEach(btn => {
-    const isTarget = (cat === "All" && btn.innerText.includes("All")) || 
-      (cat === "Main" && (btn.innerText.includes("Main") || btn.innerText.includes("ዋና"))) ||
-      (cat === "Drinks" && (btn.innerText.includes("Drink") || btn.innerText.includes("መጠጥ"))) ||
-      (cat === "Dessert" && (btn.innerText.includes("Dessert") || btn.innerText.includes("ጣፋጭ")));
-    btn.classList.toggle("active", isTarget);
-  });
-  renderCustomerMenu();
-}
-
-function handleSearch(query) {
-  searchQuery = query.toLowerCase().trim();
-  renderCustomerMenu();
-}
-
-function handleAdminSearch(query) {
-  adminSearchQuery = query.toLowerCase().trim();
-  renderAdminMenu();
-}
-
-function updateCategoryCounts(allItems) {
-  const availableItems = allItems.filter(i => i.available !== false && i.available !== "false");
-  const countAll = document.getElementById("countAll");
-  const countMain = document.getElementById("countMain");
-  const countDrinks = document.getElementById("countDrinks");
-  const countDessert = document.getElementById("countDessert");
-
-  if (countAll) countAll.innerText = availableItems.length;
-  if (countMain) countMain.innerText = availableItems.filter(i => i.category === "Main").length;
-  if (countDrinks) countDrinks.innerText = availableItems.filter(i => i.category === "Drinks").length;
-  if (countDessert) countDessert.innerText = availableItems.filter(i => i.category === "Dessert").length;
-}
-
-// --- RENDER CUSTOMER MENU ---
-async function renderCustomerMenu() {
-  const container = document.getElementById("customerMenu");
-  if (!container) return;
-
-  const allItems = await DataService.fetchMenuItems();
-  renderCart();
-  setServiceMode(selectedServiceMode);
-  updateCategoryCounts(allItems);
-  renderCustomerOrderTracker();
-
-  const filteredItems = allItems.filter(item => {
-    const isAvailable = item.available !== false && item.available !== "false";
-    const cat = item.category ? item.category.toLowerCase().trim() : "";
-    const selCat = selectedCategory.toLowerCase().trim();
-
-    const matchesCat = selectedCategory === "All" || 
-      cat === selCat || 
-      (selCat === "main" && cat.includes("main")) ||
-      (selCat === "drinks" && (cat.includes("drink") || cat.includes("beverage"))) ||
-      (selCat === "dessert" && cat.includes("dessert"));
-
-    const matchesSearch = !searchQuery || 
-      item.name.toLowerCase().includes(searchQuery) || 
-      (item.desc && item.desc.toLowerCase().includes(searchQuery));
-
-    return isAvailable && matchesCat && matchesSearch;
-  });
-
-  if (filteredItems.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-state-icon"><i class="fa-solid fa-plate-wheat"></i></div>
-        <h3>No Menu Items Found</h3>
-        <p>Try searching for something else or changing categories.</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = filteredItems.map(item => `
-    <div class="glass-card card" onclick="openItemModal('${escapeHtml(item.id)}')">
-      <div class="card-image-wrap">
-        <img src="${escapeHtml(item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80')}" alt="${escapeHtml(item.name)}">
-        ${item.badge ? `<div class="badge-tag">${escapeHtml(item.badge)}</div>` : ''}
-      </div>
-      <div class="card-body">
-        <div class="card-header">
-          <div class="card-title">${escapeHtml(item.name)}</div>
-          <div class="card-desc">${escapeHtml(item.desc || 'Freshly prepared delicious item.')}</div>
-        </div>
-        <div class="card-footer">
-          <div class="card-price">Br ${parseFloat(item.price).toFixed(0)}</div>
-          <div class="card-actions">
-            <button class="btn-detail" onclick="event.stopPropagation(); openItemModal('${escapeHtml(item.id)}')">
-              <i class="fa-solid fa-eye"></i> ${t("detailsBtn")}
-            </button>
-            <button class="btn-order" onclick="event.stopPropagation(); addToCart('${escapeHtml(item.id)}')">
-              ${t("addBtn")}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `).join("");
-}
-
-// --- MODAL ---
-function openItemModal(id) {
-  const item = currentMenuItems.find(i => String(i.id) === String(id));
-  if (!item) return;
-
-  document.getElementById("modalImg").src = item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80';
-  document.getElementById("modalTitle").innerText = item.name;
-  document.getElementById("modalDesc").innerText = item.desc || 'Fresh gourmet dish prepared with finest ingredients.';
-  document.getElementById("modalPrice").innerText = `Br ${parseFloat(item.price).toFixed(0)}`;
-
-  const addButton = document.getElementById("modalAddToOrder");
-  if (addButton) {
-    addButton.innerText = t("addBtn");
-    addButton.onclick = () => {
-      addToCart(item.id);
-      closeItemModal();
-    };
-  }
-  
-  const badgeEl = document.getElementById("modalBadge");
-  if (badgeEl) badgeEl.innerText = item.badge || item.category;
-
-  const modal = document.getElementById("itemModal");
-  if (modal) modal.classList.add("active");
-}
-
-function closeItemModal() {
-  const modal = document.getElementById("itemModal");
-  if (modal) modal.classList.remove("active");
-}
-
-function closeModalOnBackdrop(event) {
-  if (event.target.id === "itemModal") closeItemModal();
-}
-
-// --- ADMIN CONTROL CENTER ---
-function updateAdminStats(items) {
-  const total = items.length;
-  const active = items.filter(i => i.available !== false && i.available !== "false").length;
-  const sold = total - active;
-  const avg = total > 0 ? (items.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0) / total) : 0;
-
-  const totalEl = document.getElementById("statTotalItems");
-  const activeEl = document.getElementById("statActiveItems");
-  const soldEl = document.getElementById("statSoldOutItems");
-  const avgEl = document.getElementById("statAvgPrice");
-
-  if (totalEl) totalEl.innerText = total;
-  if (activeEl) activeEl.innerText = active;
-  if (soldEl) soldEl.innerText = sold;
-  if (avgEl) avgEl.innerText = `Br ${avg.toFixed(0)}`;
-}
-
-async function handleOrderStatusChange(id, status) {
-  await DataService.updateOrderStatus(id, status);
-  await renderAdminOrders();
-  showToast(`Order status updated to ${status}`);
-}
-
-async function renderAdminOrders() {
-  const container = document.getElementById("adminOrdersList");
-  if (!container) return;
-
-  await renderAdminWaiterRequests();
-  const orders = await DataService.fetchOrders();
-
-  if (orders.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state glass-card">
-        <div class="empty-state-icon"><i class="fa-solid fa-receipt"></i></div>
-        <h3>No Incoming Orders Yet</h3>
-        <p>Customer orders will stream here in real-time as soon as they place one.</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = orders.map(order => {
-    const subtotal = order.items.reduce((total, item) => total + (parseFloat(item.price) || 0) * item.quantity, 0);
-    const statusClass = escapeHtml((order.status || 'Pending').toLowerCase());
-    const tableDisplay = order.tableNumber ? `${t("tableLabel")} ${escapeHtml(order.tableNumber)}` : 'No Table #';
-    const serviceLabel = order.serviceMode === 'takeaway' ? `🥡 ${t("takeaway")}` : `🍽️ ${t("dineIn")}`;
-
-    return `
-      <div class="glass-card order-card-admin">
-        <div class="order-admin-header">
-          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-            <div class="table-badge-prominent">
-              <i class="fa-solid fa-chair"></i> ${tableDisplay}
-            </div>
-            <div>
-              <h4 style="margin:0;">${escapeHtml(order.customerName || 'Guest')}</h4>
-              <p style="margin:0; font-size:0.82rem; color:var(--text-muted);">${serviceLabel}</p>
-            </div>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="order-status ${statusClass}">${escapeHtml(order.status || 'Pending')}</span>
-            <button class="btn-delete small" onclick="handleDeleteOrder('${escapeHtml(order.id)}')" title="Delete Order Record">
-              <i class="fa-solid fa-trash-can"></i>
-            </button>
-          </div>
-        </div>
-
-        <div class="order-admin-items">
-          ${order.items.map(item => `<div class="order-admin-item"><strong>${item.quantity}×</strong> ${escapeHtml(item.name)}</div>`).join('')}
-        </div>
-
-        <div class="order-admin-footer">
-          <div>
-            <strong>Br ${subtotal.toFixed(0)}</strong>
-            ${order.notes ? `<div class="order-notes">💬 ${escapeHtml(order.notes)}</div>` : ''}
-          </div>
-          <div class="order-admin-actions">
-            <button class="btn-order small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Preparing')">👨‍🍳 ${t("preparing")}</button>
-            <button class="btn-detail small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Ready')">🔔 ${t("ready")}</button>
-            <button class="btn-complete small" onclick="handleOrderStatusChange('${escapeHtml(order.id)}', 'Completed')">✅ ${t("completed")}</button>
-          </div>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-async function renderAdminMenu() {
-  const container = document.getElementById("adminMenuList");
-  if (!container) return;
-
-  const items = await DataService.fetchMenuItems();
-  updateAdminStats(items);
-  renderAdminOrders();
-
-  const filteredItems = items.filter(item => {
-    return !adminSearchQuery || 
-      item.name.toLowerCase().includes(adminSearchQuery) || 
-      item.category.toLowerCase().includes(adminSearchQuery);
-  });
-
-  if (filteredItems.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state glass-card">
-        <div class="empty-state-icon"><i class="fa-solid fa-folder-open"></i></div>
-        <h3>No Items Found</h3>
-        <p>No menu items match your search filter.</p>
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = filteredItems.map(item => `
-    <div class="glass-card admin-item-row">
-      <div class="admin-item-info">
-        <img src="${escapeHtml(item.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100')}" alt="${escapeHtml(item.name)}">
-        <div class="admin-item-details">
-          <h4>${escapeHtml(item.name)}</h4>
-          <span>${escapeHtml(item.category)} • ${escapeHtml(item.badge || 'Standard')}</span>
-        </div>
-      </div>
-
-      <div class="admin-controls">
-        <div class="price-input-wrap">
-          <span>Br</span>
-          <input 
-            type="number" 
-            step="1" 
-            value="${parseFloat(item.price).toFixed(0)}" 
-            class="price-input" 
-            onchange="handlePriceUpdate('${escapeHtml(item.id)}', this.value)"
-          >
-        </div>
-
-        <label class="switch" title="Toggle Stock (In Stock / Sold Out)">
-          <input 
-            type="checkbox" 
-            ${item.available !== false && item.available !== "false" ? 'checked' : ''} 
-            onchange="handleToggleAvailability('${escapeHtml(item.id)}')"
-          >
-          <span class="slider"></span>
-        </label>
-
-        <button class="btn-delete" onclick="handleDeleteItem('${escapeHtml(item.id)}')" title="Delete Menu Item">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
-      </div>
-    </div>
-  `).join("");
-}
-
-async function handleToggleAvailability(id) {
-  await DataService.toggleAvailability(id);
-  await renderAdminMenu();
-  showToast("Item availability toggled!");
-}
-
-async function handlePriceUpdate(id, newPrice) {
-  await DataService.updatePrice(id, newPrice);
-  await renderAdminMenu();
-  showToast("Item price updated!");
-}
-
-async function handleDeleteItem(id) {
-  if (confirm("Are you sure you want to delete this menu item?")) {
-    await DataService.deleteItem(id);
-    await renderAdminMenu();
-    showToast("Menu item deleted!");
-  }
-}
-
-function readImageAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject("Failed to read image");
-    reader.readAsDataURL(file);
-  });
-}
-
-async function handleAddItem(event) {
-  event.preventDefault();
-  const name = document.getElementById("itemName").value.trim();
-  const category = document.getElementById("itemCategory").value;
-  const price = parseFloat(document.getElementById("itemPrice").value);
-  const badge = document.getElementById("itemBadge").value.trim();
-  const desc = document.getElementById("itemDesc").value.trim();
-  const imageUrlInput = document.getElementById("itemImageUrl").value.trim();
-  const imageFileInput = document.getElementById("itemImage");
-  const imageFile = imageFileInput ? imageFileInput.files[0] : null;
-
-  let image = imageUrlInput;
-
-  if (imageFile) {
-    if (imageFile.size > 1024 * 1024) {
-      showToast("Uploaded image file is over 1MB. Please use an Image URL or smaller file.", "error");
-      return;
-    }
-    try {
-      image = await readImageAsDataUrl(imageFile);
-    } catch (error) {
-      showToast("Could not read selected image file.", "error");
-      return;
-    }
-  }
-
-  if (!image) {
-    image = "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=600&q=80";
-  }
-
-  const newItem = {
-    id: Date.now().toString(),
-    name,
-    category,
-    price,
-    badge,
-    desc: desc || "Freshly prepared delicious item.",
-    image,
-    available: true
-  };
-
-  await DataService.addItem(newItem);
-  event.target.reset();
-  await renderAdminMenu();
-  showToast(`Added "${name}" to menu!`);
-}
-
-async function resetToDefaultMenu() {
-  if (confirm("Reset menu to original sample items?")) {
-    await DataService.saveMenuItems(defaultMenu);
-    if (document.getElementById("adminMenuList")) renderAdminMenu();
-    if (document.getElementById("customerMenu")) renderCustomerMenu();
-    showToast("Menu reset to sample data!");
-  }
-}
-
-// Global initialization
-document.addEventListener("DOMContentLoaded", () => {
-  detectTableFromUrl();
-  applyTranslations();
-  DataService.subscribeToRealtime();
-});
