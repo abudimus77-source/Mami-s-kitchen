@@ -4,10 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ማሚስ ኪችን | Digital Menu</title>
-  <!-- FontAwesome & Styling -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
   <link rel="stylesheet" href="style.css">
-  <!-- Supabase JS Client Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -25,8 +23,6 @@
       </a>
 
       <div style="display:flex; align-items:center; gap:10px;">
-        <div id="headerTableBadge" class="table-badge-header" style="display:none;"></div>
-        
         <!-- Language Switcher -->
         <div class="lang-switcher">
           <button type="button" class="lang-btn active" data-lang="en" onclick="setLanguage('en')">EN</button>
@@ -38,9 +34,6 @@
 
   <!-- Main Content Area -->
   <main class="container">
-    <!-- Active Live Order Tracker Banner (Customer Progress Tracker) -->
-    <div id="activeOrderTracker" style="display:none; margin-bottom: 20px;"></div>
-
     <!-- Controls & Search Bar -->
     <div class="controls-bar">
       <div class="search-box">
@@ -65,87 +58,13 @@
       </nav>
     </div>
 
-    <!-- Mobile Drawer Overlay -->
-    <div id="orderOverlay" class="order-card-overlay" onclick="toggleMobileCart(false)"></div>
-
-    <div class="ordering-shell">
-      <aside id="orderCard" class="order-card">
-        <div class="order-card-header">
-          <div>
-            <p class="eyebrow">Your Order</p>
-            <h3>Ready to order</h3>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px;">
-            <span class="order-pill" id="cartCountPill">0 items</span>
-            <button class="close-cart-mobile" onclick="toggleMobileCart(false)" style="display:none; border:none; background:transparent; color:#fff; font-size:1.3rem; cursor:pointer;" title="Close Cart">&times;</button>
-          </div>
-        </div>
-
-        <div id="cartItemsList" class="cart-items-list">
-          <div class="empty-cart">Tap “Add to order” on any dish to build your meal.</div>
-        </div>
-
-        <div class="order-summary">
-          <div class="order-total-row">
-            <span>Subtotal</span>
-            <strong id="cartTotal">Br 0</strong>
-          </div>
-
-          <div class="service-toggle">
-            <button type="button" class="service-chip active" data-mode="dine-in" onclick="setServiceMode('dine-in')">
-              <i class="fa-solid fa-utensils"></i> Dine In
-            </button>
-            <button type="button" class="service-chip" data-mode="takeaway" onclick="setServiceMode('takeaway')">
-              <i class="fa-solid fa-bag-shopping"></i> Takeaway
-            </button>
-          </div>
-
-          <label class="form-row">
-            <span>Name</span>
-            <input type="text" id="customerName" placeholder="Your name">
-          </label>
-
-          <label class="form-row" id="tableRow">
-            <span>Table Number</span>
-            <input type="text" id="tableNumber" placeholder="e.g. 12">
-          </label>
-
-          <label class="form-row">
-            <span>Notes</span>
-            <textarea id="orderNotes" rows="2" placeholder="Allergies or special requests"></textarea>
-          </label>
-
-          <button class="btn-primary order-btn" onclick="placeOrder()">Place Order</button>
-        </div>
-      </aside>
-
-      <section class="menu-section">
-        <div id="customerMenu" class="menu-grid">
-          <!-- Menu items dynamically rendered here -->
-        </div>
-      </section>
-    </div>
+    <!-- Menu Grid Area -->
+    <section class="menu-section">
+      <div id="customerMenu" class="menu-grid">
+        <!-- Menu items dynamically rendered here -->
+      </div>
+    </section>
   </main>
-
-  <!-- Floating Digital Waiter Actions (Customer Side) -->
-  <div class="waiter-floating-actions">
-    <button type="button" class="waiter-action-btn" onclick="handleCustomerWaiterAction('call_waiter')" title="Call Waiter">
-      <i class="fa-solid fa-bell-concierge"></i> <span class="waiter-btn-text">Call Waiter</span>
-    </button>
-    <button type="button" class="waiter-action-btn bill" onclick="handleCustomerWaiterAction('request_bill')" title="Request Bill">
-      <i class="fa-solid fa-receipt"></i> <span class="waiter-btn-text">Request Bill</span>
-    </button>
-  </div>
-
-  <!-- Floating Mobile Order Bar -->
-  <div id="mobileCartBar" class="mobile-cart-bar" onclick="toggleMobileCart(true)">
-    <div style="display:flex; align-items:center; gap:8px;">
-      <i class="fa-solid fa-bag-shopping"></i>
-      <span>View Order</span>
-      <span class="mobile-cart-badge" id="mobileCartBadge">0</span>
-    </div>
-    <strong id="mobileCartTotal">Br 0</strong>
-  </div>
 
   <!-- Item Detail Modal -->
   <div id="itemModal" class="modal-overlay" onclick="closeModalOnBackdrop(event)">
@@ -160,16 +79,12 @@
         <p id="modalDesc" class="card-desc" style="line-clamp:initial; -webkit-line-clamp:initial; margin-bottom:16px; font-size:0.92rem;">Item description...</p>
         <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:16px; padding-top:14px; border-top:1px solid var(--border-glass);">
           <span id="modalPrice" class="card-price" style="font-size:1.5rem;">Br 0</span>
-          <div class="card-actions">
-            <button class="btn-detail" onclick="closeItemModal()">Close</button>
-            <button id="modalAddToOrder" class="btn-order">Add to Order</button>
-          </div>
+          <button class="btn-detail" onclick="closeItemModal()">Close</button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Toast Container -->
   <div id="toastContainer" class="toast-container"></div>
 
   <script src="app.js"></script>
