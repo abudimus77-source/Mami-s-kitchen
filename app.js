@@ -1,6 +1,6 @@
 /* ==========================================================================
-   ማሚስ ኪችን (Mami's Kitchen) - Passcode Protected Digital Menu Engine
-   Per-Client Custom Passcode: Wolkite@2026
+   ማሚስ ኪችን (Mami's Kitchen) - Pure Digital Menu Engine
+   Ultra-Responsive, Instant Local-First Data Layer
    ========================================================================== */
 
 const SUPABASE_URL = "https://cqubbysmuvawqoccickl.supabase.co";
@@ -19,7 +19,7 @@ if (typeof supabase !== "undefined") {
   }
 }
 
-// Default initial menu is empty slate
+// Default menu is completely empty - No automatic default items added!
 const defaultMenu = [];
 
 // 3. I18N BILINGUAL TRANSLATION DICTIONARY
@@ -63,12 +63,12 @@ function normalizeCategory(catStr) {
   return "Main";
 }
 
-// 4. DATA SERVICE LAYER
+// 4. INSTANT LOCAL-FIRST DATA SERVICE LAYER
 let cachedMenu = null;
 
 class DataService {
   static getMenuItemsSync() {
-    if (cachedMenu !== null) {
+    if (cachedMenu !== null && Array.isArray(cachedMenu)) {
       return cachedMenu;
     }
 
@@ -77,7 +77,16 @@ class DataService {
       try {
         const parsed = JSON.parse(localData);
         if (Array.isArray(parsed)) {
-          cachedMenu = parsed.map(i => ({ ...i, category: normalizeCategory(i.category) }));
+          cachedMenu = parsed.map(i => ({
+            id: String(i.id),
+            name: String(i.name || "Untitled Item"),
+            category: normalizeCategory(i.category),
+            price: Number(i.price) || 0,
+            available: i.available !== false && i.available !== "false",
+            badge: String(i.badge || "Popular"),
+            description: String(i.description || i.desc || ""),
+            image: String(i.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80")
+          }));
           return cachedMenu;
         }
       } catch (e) {}
@@ -93,7 +102,7 @@ class DataService {
 
     try {
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Supabase Timeout")), 2500)
+        setTimeout(() => reject(new Error("Supabase Timeout")), 3000)
       );
 
       const fetchPromise = supabaseClient.from("menu_items").select("*").order("created_at", { ascending: false });
@@ -126,21 +135,28 @@ class DataService {
     cachedMenu = menu;
     localStorage.setItem("mamis_basic_menu", JSON.stringify(menu));
 
-    if (supabaseClient) {
+    // Instant local UI refresh
+    if (document.getElementById("customerMenu")) renderCustomerMenuUI();
+    if (document.getElementById("adminMenuList")) renderAdminMenuUI();
+
+    if (supabaseClient && Array.isArray(menu) && menu.length > 0) {
       try {
-        for (const item of menu) {
-          await supabaseClient.from("menu_items").upsert({
-            id: String(item.id),
-            name: item.name,
-            category: normalizeCategory(item.category),
-            price: Number(item.price),
-            available: item.available,
-            badge: item.badge,
-            description: item.description,
-            image: item.image
-          });
-        }
-      } catch (e) {}
+        const payload = menu.map(item => ({
+          id: String(item.id),
+          name: String(item.name || "Untitled Item"),
+          category: normalizeCategory(item.category),
+          price: Number(item.price) || 0,
+          available: item.available !== false && item.available !== "false",
+          badge: String(item.badge || "Popular"),
+          description: String(item.description || ""),
+          image: String(item.image || "")
+        }));
+
+        // Single batch upsert call
+        await supabaseClient.from("menu_items").upsert(payload, { onConflict: "id" });
+      } catch (e) {
+        console.warn("Supabase batch sync warning:", e);
+      }
     }
   }
 
@@ -171,6 +187,9 @@ class DataService {
         await supabaseClient.from("menu_items").delete().eq("id", id);
       } catch (e) {}
     }
+
+    if (document.getElementById("customerMenu")) renderCustomerMenuUI();
+    if (document.getElementById("adminMenuList")) renderAdminMenuUI();
   }
 
   static async clearAllItems() {
@@ -182,6 +201,9 @@ class DataService {
         await supabaseClient.from("menu_items").delete().neq("id", "0");
       } catch (e) {}
     }
+
+    if (document.getElementById("customerMenu")) renderCustomerMenuUI();
+    if (document.getElementById("adminMenuList")) renderAdminMenuUI();
   }
 }
 
@@ -232,10 +254,10 @@ function renderCustomerMenuUI() {
 
   if (filtered.length === 0) {
     container.innerHTML = `
-      <div class="empty-state" style="grid-column: 1 / -1;">
-        <i class="fa-solid fa-utensils empty-state-icon"></i>
-        <h3>No dishes on the menu</h3>
-        <p>The menu is currently empty. Items added from the control panel will appear here.</p>
+      <div class="empty-state" style="grid-column: 1 / -1; padding: 50px 20px;">
+        <i class="fa-solid fa-utensils empty-state-icon" style="font-size:3rem; color:var(--primary); margin-bottom:16px;"></i>
+        <h3 style="color:#fff; font-size:1.3rem; margin-bottom:8px;">No dishes on the menu</h3>
+        <p style="color:var(--text-muted); font-size:0.9rem;">Dishes added from the owner control panel will appear here live.</p>
       </div>
     `;
     return;
@@ -272,7 +294,7 @@ function renderCustomerMenuUI() {
 
 function getBadgeIcon(badge) {
   if (!badge) return "star";
-  const b = badge.toLowerCase();
+  const b = String(badge).toLowerCase();
   if (b.includes("trad")) return "fire";
   if (b.includes("chef")) return "user-ninja";
   if (b.includes("fresh")) return "leaf";
@@ -440,20 +462,17 @@ async function handleAdminPriceChange(id, val) {
   if (isNaN(price) || price < 0) return;
   await DataService.updateItemPriceAndStock(id, price, undefined);
   showToast("Price updated successfully!");
-  renderAdminMenuUI();
 }
 
 async function handleAdminStockToggle(id, isChecked) {
   await DataService.updateItemPriceAndStock(id, undefined, isChecked);
   showToast(isChecked ? "Item marked as In Stock" : "Item marked as Sold Out");
-  renderAdminMenuUI();
 }
 
 async function handleAdminItemDelete(id) {
   if (confirm("Are you sure you want to delete this dish from the menu?")) {
     await DataService.deleteItem(id);
     showToast("Dish removed from menu");
-    renderAdminMenuUI();
   }
 }
 
@@ -461,8 +480,6 @@ async function clearAllMenuData() {
   if (confirm("Are you sure you want to delete ALL items from the menu? This will give you a completely clean menu slate.")) {
     await DataService.clearAllItems();
     showToast("All items deleted. Menu is now empty!");
-    if (document.getElementById("customerMenu")) renderCustomerMenuUI();
-    if (document.getElementById("adminMenuList")) renderAdminMenuUI();
   }
 }
 
@@ -512,7 +529,6 @@ async function handleAddNewItem(e) {
 
   e.target.reset();
   uploadedImageBase64 = "";
-  renderAdminMenuUI();
 }
 
 function showToast(message) {
@@ -538,9 +554,4 @@ function escapeHtml(str) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-}
-EOF
-}
-}
-EOF
 }
