@@ -1,5 +1,5 @@
 /* ==========================================================================
-   ማሚስ ኪችን (Mami's Kitchen) - Ultra-Fast Data Engine (0.01s Instant Load)
+   ማሚስ ኪችን (Mami's Kitchen) - Supabase Auth & Pure Digital Menu Engine
    ========================================================================== */
 
 const SUPABASE_URL = "https://cqubbysmuvawqoccickl.supabase.co";
@@ -9,10 +9,13 @@ let supabaseClient = null;
 if (typeof supabase !== "undefined") {
   try {
     supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  } catch (err) {}
+    console.log("🟢 Connected to Supabase Cloud Backend");
+  } catch (err) {
+    console.warn("Supabase client init warning:", err);
+  }
 }
 
-// 2. DEFAULT INITIAL MENU DATA (Instant Fallback)
+// 2. DEFAULT INITIAL MENU DATA
 const defaultMenu = [
   {
     id: "item_1",
@@ -127,7 +130,6 @@ function setLanguage(lang) {
   if (document.getElementById("adminMenuList")) renderAdminMenuUI();
 }
 
-// Helper: Normalize category strings
 function normalizeCategory(catStr) {
   if (!catStr) return "Main";
   const c = String(catStr).toLowerCase().trim();
@@ -137,11 +139,9 @@ function normalizeCategory(catStr) {
   return "Main";
 }
 
-// 4. BLAZING FAST NON-BLOCKING DATA SERVICE LAYER
 let cachedMenu = null;
 
 class DataService {
-  // Synchronous/instant menu fetch (0ms execution time!)
   static getMenuItemsSync() {
     if (cachedMenu && cachedMenu.length > 0) {
       return cachedMenu;
@@ -163,7 +163,6 @@ class DataService {
     return defaultMenu;
   }
 
-  // Non-blocking background Cloud Sync with 2.5s Hard Timeout
   static async syncFromSupabaseBackground() {
     if (!supabaseClient) return;
 
@@ -190,7 +189,6 @@ class DataService {
 
         localStorage.setItem("mamis_basic_menu", JSON.stringify(cachedMenu));
 
-        // Smooth background refresh of UI if cloud data changed
         if (document.getElementById("customerMenu")) renderCustomerMenuUI();
         if (document.getElementById("adminMenuList")) renderAdminMenuUI();
       } else if (!error && Array.isArray(data) && data.length === 0) {
@@ -269,14 +267,12 @@ class DataService {
   }
 }
 
-// 5. CUSTOMER SIDE MENU DISPLAY ENGINE (INSTANT RENDERING)
+// 5. CUSTOMER SIDE MENU DISPLAY ENGINE
 let activeCategory = "All";
 let activeSearchQuery = "";
 
 function renderCustomerMenu() {
-  // 1. Render immediately from memory/localStorage (0ms)
   renderCustomerMenuUI();
-  // 2. Non-blocking background sync with Supabase
   DataService.syncFromSupabaseBackground();
 }
 
@@ -375,8 +371,6 @@ function filterCategory(cat) {
       (cat === "Dessert" && (btnText.includes("dessert") || btnText.includes("ጣፋጭ")));
     btn.classList.toggle("active", isTarget);
   });
-  
-  // Instant in-memory rendering (0ms)
   renderCustomerMenuUI();
 }
 
@@ -385,7 +379,6 @@ function handleSearch(query) {
   renderCustomerMenuUI();
 }
 
-// 6. ITEM DETAIL MODAL
 function openItemModal(id) {
   const menu = DataService.getMenuItemsSync();
   const item = menu.find(i => String(i.id) === String(id));
@@ -410,28 +403,111 @@ function closeModalOnBackdrop(e) {
   if (e.target.id === "itemModal") closeItemModal();
 }
 
-// 7. ADMIN DASHBOARD ENGINE
-function verifyAdminPasscode() {
-  const val = document.getElementById("adminPasscode").value;
-  if (val === "@abudi77") {
-    document.getElementById("passcodeModal").classList.remove("active");
-    document.getElementById("adminContent").style.display = "block";
-    sessionStorage.setItem("admin_auth", "true");
-    initAdminDashboard();
+// 6. SUPABASE EMAIL & PASSWORD AUTHENTICATION SYSTEM
+let isSignUpMode = false;
+
+function toggleAuthMode(e) {
+  if (e) e.preventDefault();
+  isSignUpMode = !isSignUpMode;
+
+  const title = document.getElementById("authModalTitle");
+  const sub = document.getElementById("authModalSubtitle");
+  const btn = document.getElementById("authSubmitBtn");
+  const toggleText = document.getElementById("authToggleText");
+  const toggleLink = document.getElementById("authToggleLink");
+
+  if (isSignUpMode) {
+    title.textContent = "Create Restaurant Account";
+    sub.textContent = "Register your email & password to manage your digital menu";
+    btn.textContent = "Register New Account";
+    toggleText.textContent = "Already have an account?";
+    toggleLink.textContent = "Sign In Instead";
   } else {
-    document.getElementById("passcodeError").style.display = "block";
+    title.textContent = "Owner Sign In";
+    sub.textContent = "Enter your email & password to manage your menu";
+    btn.textContent = "Sign In To Dashboard";
+    toggleText.textContent = "Need an account?";
+    toggleLink.textContent = "Create Restaurant Account";
+  }
+
+  document.getElementById("authError").style.display = "none";
+}
+
+async function checkSupabaseSession() {
+  if (!supabaseClient) {
+    document.getElementById("authModal").classList.remove("active");
+    document.getElementById("adminContent").style.display = "block";
+    renderAdminMenuUI();
+    return;
+  }
+
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session && session.user) {
+    onAuthSuccess(session.user);
+  } else {
+    document.getElementById("authModal").classList.add("active");
+    document.getElementById("adminContent").style.display = "none";
   }
 }
 
-function initAdminDashboard() {
-  if (sessionStorage.getItem("admin_auth") === "true") {
-    document.getElementById("passcodeModal").classList.remove("active");
-    document.getElementById("adminContent").style.display = "block";
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  const email = document.getElementById("adminEmail").value.trim();
+  const password = document.getElementById("adminPassword").value.trim();
+  const errEl = document.getElementById("authError");
+
+  errEl.style.display = "none";
+
+  if (!supabaseClient) {
+    errEl.textContent = "Database connection error.";
+    errEl.style.display = "block";
+    return;
   }
+
+  if (isSignUpMode) {
+    const { data, error } = await supabaseClient.auth.signUp({ email, password });
+    if (error) {
+      errEl.textContent = error.message;
+      errEl.style.display = "block";
+    } else {
+      showToast("Account created! Logging in...");
+      if (data.user) onAuthSuccess(data.user);
+    }
+  } else {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) {
+      errEl.textContent = "Invalid email or password! Please try again.";
+      errEl.style.display = "block";
+    } else {
+      showToast("Welcome back! Signed in successfully.");
+      if (data.user) onAuthSuccess(data.user);
+    }
+  }
+}
+
+function onAuthSuccess(user) {
+  document.getElementById("authModal").classList.remove("active");
+  document.getElementById("adminContent").style.display = "block";
+
+  const emailText = document.getElementById("userEmailText");
+  if (emailText && user && user.email) {
+    emailText.textContent = user.email;
+  }
+
   renderAdminMenuUI();
   DataService.syncFromSupabaseBackground();
 }
 
+async function logoutFromSupabase() {
+  if (supabaseClient) {
+    await supabaseClient.auth.signOut();
+  }
+  document.getElementById("adminContent").style.display = "none";
+  document.getElementById("authModal").classList.add("active");
+  showToast("Logged out successfully");
+}
+
+// 7. ADMIN DASHBOARD ENGINE
 function renderAdminMenuUI(filterQuery = "") {
   const container = document.getElementById("adminMenuList");
   if (!container) return;
