@@ -1,6 +1,5 @@
 /* ==========================================================================
-   ማሚስ ኪችን (Mami's Kitchen) - Pure Digital Menu Engine
-   Ultra-Responsive, Instant Local-First Data Layer
+   ማሚስ ኪችን (Mami's Kitchen) - Pure Digital Menu Engine (Clean Slate)
    ========================================================================== */
 
 const SUPABASE_URL = "https://cqubbysmuvawqoccickl.supabase.co";
@@ -19,7 +18,7 @@ if (typeof supabase !== "undefined") {
   }
 }
 
-// Default menu is completely empty - No automatic default items added!
+// Default menu is PERMANENTLY EMPTY - No sample items will ever auto-populate!
 const defaultMenu = [];
 
 // 3. I18N BILINGUAL TRANSLATION DICTIONARY
@@ -135,7 +134,6 @@ class DataService {
     cachedMenu = menu;
     localStorage.setItem("mamis_basic_menu", JSON.stringify(menu));
 
-    // Instant local UI refresh
     if (document.getElementById("customerMenu")) renderCustomerMenuUI();
     if (document.getElementById("adminMenuList")) renderAdminMenuUI();
 
@@ -152,7 +150,6 @@ class DataService {
           image: String(item.image || "")
         }));
 
-        // Single batch upsert call
         await supabaseClient.from("menu_items").upsert(payload, { onConflict: "id" });
       } catch (e) {
         console.warn("Supabase batch sync warning:", e);
